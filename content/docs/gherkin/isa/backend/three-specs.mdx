@@ -13,32 +13,44 @@ SpecFormula 的後端測試框架建立在三份核心規格文件之上，我�
 | **Entity Mapping** | `entity_to_table_mapping.yml` | 定義業務實體與資料表的對應關係 |
 | **ISA Config** | `isa.yml` | 定義指令語法與測試環境配置 |
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│                    .feature 測試檔案                         │
-│  Given 準備一個特務, with table: ...                         │
-│  When (UID="$Agent.id") 打卡, call table: ...               │
-│  Then 應該存在一個打卡記錄, with table: ...                   │
-└─────────────────────────────────────────────────────────────┘
-          │                    │                    │
-          ▼                    ▼                    ▼
-┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐
-│  Entity Mapping │  │    API Spec     │  │   ISA Config    │
-│                 │  │                 │  │                 │
-│  特務 → agents  │  │  summary: 打卡   │  │  指令格式定義    │
-│  打卡記錄 →     │  │  POST /punch    │  │  資料來源配置    │
-│  punch_records  │  │  request/       │  │  時間格式設定    │
-│                 │  │  response       │  │                 │
-└─────────────────┘  └─────────────────┘  └─────────────────┘
-          │                    │                    │
-          ▼                    ▼                    ▼
-┌─────────────────────────────────────────────────────────────┐
-│                      SpecFormula 引擎                        │
-│  • 解析指令語法 → 識別操作類型                                │
-│  • 查詢 Entity Mapping → 定位資料表                          │
-│  • 查詢 API Spec → 建構 HTTP 請求                            │
-│  • 執行操作並驗證結果                                         │
-└─────────────────────────────────────────────────────────────┘
+```mermaid
+flowchart TB
+    subgraph Feature[".feature 測試檔案"]
+        F1["Given 準備一個特務, with table: ..."]
+        F2["When (UID=$Agent.id) 打卡, call table: ..."]
+        F3["Then 應該存在一個打卡記錄, with table: ..."]
+    end
+
+    subgraph Specs["規格三巨頭"]
+        subgraph EM["Entity Mapping"]
+            EM1["特務 → agents"]
+            EM2["打卡記錄 → punch_records"]
+        end
+        subgraph API["API Spec"]
+            API1["summary: 打卡"]
+            API2["POST /punch"]
+            API3["request/response"]
+        end
+        subgraph ISA["ISA Config"]
+            ISA1["指令格式定義"]
+            ISA2["資料來源配置"]
+            ISA3["時間格式設定"]
+        end
+    end
+
+    subgraph Engine["SpecFormula 引擎"]
+        E1["解析指令語法 → 識別操作類型"]
+        E2["查詢 Entity Mapping → 定位資料表"]
+        E3["查詢 API Spec → 建構 HTTP 請求"]
+        E4["執行操作並驗證結果"]
+    end
+
+    Feature --> EM
+    Feature --> API
+    Feature --> ISA
+    EM --> Engine
+    API --> Engine
+    ISA --> Engine
 ```
 
 ## 為什麼要三份規格一起維護？
