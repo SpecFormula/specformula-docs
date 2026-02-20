@@ -1,0 +1,160 @@
+---
+title: VAR-System
+description: Variable extraction, storage, and reference
+---
+
+VAR-System lets you pass dynamically generated values between test steps, such as auto-generated database IDs or tokens from API responses.
+
+## Four Syntax Forms
+
+| Syntax | Name | Position | Purpose |
+|--------|------|----------|---------|
+| `>contextKey` | Context Key | DataTable header | Define variable name |
+| `<executionKey` | Execution Key | DataTable data | Specify field to extract |
+| `$variable` | Variable Reference | Any value position | Reference variable (preserves type) |
+| `${variable}` | String Interpolation | Within strings | Embed variable (converts to string) |
+
+## Extract Variables
+
+Use `>` and `<` pairs to extract values from execution results:
+
+```gherkin
+When create user, call table:
+  | >userId | >userToken | name  | email             |
+  | <id     | <token     | Alice | alice@example.com |
+```
+
+After execution:
+- `userId` = value of `id` field from response
+- `userToken` = value of `token` field from response
+
+## Reference Variables
+
+### `$variable` (Type Preserving)
+
+```gherkin
+Then validate user exists, with:
+  | id      | name  |
+  | $userId | Alice |
+```
+
+`$userId` preserves the original type (Integer, String, etc.).
+
+### `${variable}` (Converts to String)
+
+```gherkin
+When batch query, call table:
+  | Q:ids                     |
+  | ${user1.id},${user2.id}   |
+```
+
+`${...}` converts the value to a string, suitable for combining multiple variables.
+
+## `$var` vs `${var}`
+
+| Aspect | `$variable` | `${variable}` |
+|--------|-------------|---------------|
+| Use case | Entire value is the variable | Embedded within a string |
+| Type | Preserves original type | Converts to String |
+| Multiple variables | Not supported | Supported |
+| Example | `$userId` → `12345` | `"ID: ${userId}"` → `"ID: 12345"` |
+
+## Nested Paths
+
+Supports dot notation and array indexing:
+
+```gherkin
+# Object nesting
+| >orderId           |
+| <order.details.id  |
+
+# Array indexing
+| >firstItem     |
+| <items[0].name |
+```
+
+## Pairing Rules
+
+`>` and `<` must be paired within the same column:
+
+```
+Header:  | >contextKey | normalField | >anotherKey |
+Data:    | <fieldName  | normalData  | <otherField |
+         ↑ paired       ↑ not paired  ↑ paired
+```
+
+## Quote Rules
+
+- When wrapped in quotes in DataTable, **not parsed**: `"$var"` is treated as plain string
+- In JSON DocString, variables **must be quoted**:
+
+```gherkin
+# ✅ Correct
+"""json
+{ "userId": "$userId" }
+"""
+
+# ❌ Wrong (cannot convert to JSON)
+"""json
+{ "userId": $userId }
+"""
+```
+
+## Edge Behaviors
+
+### Null Handling
+
+```gherkin
+# Execution result is null → stored in ScenarioContext as null
+| >agentId |
+| <id      |  # id is null → agentId = null
+
+# Variable not found → returns original string
+| $undefinedVar |  # → string "$undefinedVar"
+```
+
+### String Interpolation Edge Cases
+
+```gherkin
+# Unclosed bracket → preserves original text
+| User ${name without closing |  # → "User ${name without closing"
+
+# Variable doesn't exist → preserves original text
+| User ${notFound} |  # → "User ${notFound}"
+```
+
+## Reserved Words
+
+`now` is a reserved word and cannot be used as a Context Key:
+
+```gherkin
+# ❌ Error
+| >now |
+```
+
+## Complete Example
+
+```gherkin
+Feature: Variable Passing
+
+  Example: Create user then query
+    # 1. Extract user ID
+    When (No Actor) create user, call table:
+      | >user1.id | name  | email             |
+      | <userId   | Alice | alice@example.com |
+
+    # 2. Use variable for query
+    When (UID="$user1.id") get profile, call table:
+      | |
+    Then get profile(200) response, with table:
+      | userId     | name  |
+      | $user1.id  | Alice |
+
+    # 3. String interpolation for batch query
+    When (No Actor) create user, call table:
+      | >user2.id | name | email           |
+      | <userId   | Bob  | bob@example.com |
+    When (No Actor) batch get users, call table:
+      | Q:userIds                   |
+      | ${user1.id},${user2.id}     |
+```

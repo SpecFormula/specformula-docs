@@ -1,0 +1,112 @@
+---
+title: EntityNonExistenceValidate
+description: Validate database record non-existence
+---
+
+EntityNonExistenceValidate lets you verify that a record has been deleted from the database, commonly used for testing delete operations.
+
+## Basic Usage
+
+```gherkin
+And should not exist a todo, with table:
+  | todoId    | userId    |
+  | $todo1.id | $Alice.id |
+```
+
+This syntax will:
+1. Use the provided fields as query conditions
+2. Validate the query result is empty (record does not exist)
+
+## Use Case
+
+After a delete operation, confirm the record has been removed from the database:
+
+```gherkin
+When (UID="$Alice.id") delete todo, call table:
+  | P:todoId  |
+  | $todo1.id |
+Then delete todo(200) response, with table:
+  | message          |
+  | Delete succeeded |
+And should not exist a todo, with table:
+  | todoId    |
+  | $todo1.id |
+```
+
+## Lookup Strategies
+
+### PK Query (Priority)
+
+Provide the complete primary key:
+
+```gherkin
+| todoId    |
+| $todo1.id |
+```
+
+### Probe Query
+
+Use non-PK fields as query conditions:
+
+```gherkin
+| userId    | title    |
+| $Alice.id | Buy milk |
+```
+
+## Field Name Conversion
+
+DataTable uses camelCase, the framework automatically maps to database snake_case:
+
+```
+DataTable: orderId   → DB: order_id
+DataTable: productId → DB: product_id
+```
+
+## Limitations
+
+This instruction does not support:
+- CAS constraint symbols (`&...`)
+- VAR extraction keys (`>contextKey`)
+- Response source fields (`<executionKey`)
+
+## Error Handling
+
+### Lint Phase
+
+| Error | Description |
+|-------|-------------|
+| Entity not defined | Not found in `entity_to_table_mapping` |
+| Field not found | Field not found in table definition |
+| Unsupported symbol | CAS or VAR extraction syntax used |
+
+### Runtime
+
+| Error | Description |
+|-------|-------------|
+| Record still exists | Record expected to not exist actually exists |
+| Missing query condition | No fields provided as query conditions |
+
+## Complete Example
+
+```gherkin
+Feature: Delete Todo
+
+  Background:
+    Given prepare a user, with table:
+      | >Alice.id | name  | email             | status |
+      | <userId   | Alice | alice@example.com | ACTIVE |
+
+  Example: Delete a todo item
+    When (UID="$Alice.id") create todo, call table:
+      | >todo1.id | title    |
+      | <todoId   | Buy milk |
+    When (UID="$Alice.id") delete todo, call table:
+      | P:todoId  |
+      | $todo1.id |
+    Then delete todo(200) response, with table:
+      | message          |
+      | Delete succeeded |
+    And should not exist a todo, with table:
+      | todoId    | userId    |
+      | $todo1.id | $Alice.id |
+```

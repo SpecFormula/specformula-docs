@@ -1,0 +1,139 @@
+---
+title: Configuration
+description: isa.yml configuration structure and settings
+---
+
+SpecFormula uses the `isa.yml` configuration file to define the test framework's runtime specifications, including API Spec, Data Spec, and instruction mappings.
+
+## Complete Example
+
+```yaml
+config:
+  api:
+    resource_path: specs/api
+    project_path: my-project/src/test/resources/specs/api
+    time_format: ISO
+  data:
+    source:
+      - name: default
+        resource_path: specs/data
+        project_path: my-project/src/test/resources/specs/data
+        db_type: postgresql
+
+instructions:
+  - name: Time control
+    format: ^current time is "(?P<time>.+)"$
+    instruction_type: time_control
+
+  - name: Data preparation
+    format: ^prepare a (?P<entity>[\w\s]+), with table:$
+    instruction_type: entity_setup
+
+  - name: API call
+    format: ^\((?:No Actor|UID="(?P<userId>\$[\w.]+)")\) (?P<summary>.+?), call table:$
+    instruction_type: api_call
+
+  - name: Response validation
+    format: ^(?P<summary>.+?)\((?P<status_code>\d{3})\) response,?\s*with table:$
+    instruction_type: response_validate
+
+  - name: Database validation
+    format: ^should exist a (?P<entity>[\w\s]+), with table:$
+    instruction_type: entity_validate
+```
+
+## API Configuration
+
+`config.api` sets the location of the OpenAPI spec file:
+
+| Field | Description | Default |
+|-------|-------------|---------|
+| `resource_path` | API Spec path in classpath | `specs/api` |
+| `project_path` | API Spec path in project (for Lint) | — |
+| `time_format` | Output format for time expressions | `ISO` |
+
+### Time Formats
+
+| Value | Output Example |
+|-------|----------------|
+| `ISO` (default) | `"2025-12-25T14:30:00+08:00"` |
+| `TIMESTAMP` | `1766735400000` (Unix milliseconds) |
+| `EPOCH` | `1766735400` (Unix seconds) |
+| `DATE_ONLY` | `"2025-12-25"` |
+| `TIME_ONLY` | `"14:30:00"` |
+
+## Database Configuration
+
+`config.data` sets the location of database spec files, supporting multiple data sources:
+
+| Field | Description | Default |
+|-------|-------------|---------|
+| `permission` | Data source permission isolation mode | `isolated` |
+| `reuse` | Whether to reuse Testcontainer containers | `false` |
+| `source` | List of data sources | — |
+
+Fields for each `source` item:
+
+| Field | Description |
+|-------|-------------|
+| `name` | Data source name |
+| `resource_path` | DDL and mapping file path |
+| `db_type` | Database type: `h2`, `postgresql`, `mysql`, `mssql` |
+
+### Folder Structure
+
+```
+specs/data/
+├── schema.sql                    # DDL definition
+└── entity_to_table_mapping.yml   # Entity to Table mapping
+```
+
+### Entity Mapping
+
+Defines the mapping between business names used in Gherkin and database tables:
+
+```yaml
+entity_to_table_mapping:
+  - user: users
+  - todo: todos
+```
+
+Usage:
+
+```gherkin
+Given prepare a user, with table:
+  | name  | email             |
+  | Alice | alice@example.com |
+```
+
+## Instruction Mapping
+
+`instructions` defines the mapping between Gherkin Step text and ISA instructions:
+
+| Field | Description |
+|-------|-------------|
+| `name` | Instruction name (for identification and error messages) |
+| `format` | Regular expression to match Gherkin Steps |
+| `instruction_type` | Corresponding ISA instruction type |
+
+### Instruction Type Reference
+
+| instruction_type | Corresponding Instruction |
+|------------------|---------------------------|
+| `time_control` | [TimeControl](/docs/gherkin/isa/backend/instructions/time-control) |
+| `entity_setup` | [EntitySetup](/docs/gherkin/isa/backend/instructions/entity-setup) |
+| `api_call` | [ApiCall](/docs/gherkin/isa/backend/instructions/api-call) |
+| `response_validate` | [ResponseValidate](/docs/gherkin/isa/backend/instructions/response-validate) |
+| `entity_validate` | [EntityValidate](/docs/gherkin/isa/backend/instructions/entity-validate) |
+
+### Regular Expression Capture Groups
+
+Use `(?P<name>...)` syntax to capture parameters from Steps:
+
+| instruction_type | Required Groups |
+|------------------|-----------------|
+| `time_control` | `time` |
+| `entity_setup` | `entity` |
+| `api_call` | `summary`, `userId` (optional) |
+| `response_validate` | `summary`, `status_code` |
+| `entity_validate` | `entity` |

@@ -7,9 +7,13 @@ import { createRelativeLink } from 'fumadocs-ui/mdx';
 import { LLMCopyButton, ViewOptions } from '@/components/ai/page-actions';
 import { gitConfig } from '@/lib/layout.shared';
 
-export default async function Page(props: PageProps<'/docs/[[...slug]]'>) {
+interface PageProps {
+  params: Promise<{ lang: string; slug?: string[] }>;
+}
+
+export default async function Page(props: PageProps) {
   const params = await props.params;
-  const page = source.getPage(params.slug);
+  const page = source.getPage(params.slug, params.lang);
   if (!page) notFound();
 
   const MDX = page.data.body;
@@ -37,13 +41,13 @@ export default async function Page(props: PageProps<'/docs/[[...slug]]'>) {
   );
 }
 
-export async function generateStaticParams() {
+export function generateStaticParams() {
   return source.generateParams();
 }
 
-export async function generateMetadata(props: PageProps<'/docs/[[...slug]]'>): Promise<Metadata> {
+export async function generateMetadata(props: PageProps): Promise<Metadata> {
   const params = await props.params;
-  const page = source.getPage(params.slug);
+  const page = source.getPage(params.slug, params.lang);
   if (!page) notFound();
 
   return {

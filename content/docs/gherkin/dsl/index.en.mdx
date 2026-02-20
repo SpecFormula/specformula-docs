@@ -1,0 +1,172 @@
+---
+title: Gherkin DSL
+description: Introduction to Gherkin Syntax
+---
+
+Gherkin is a domain-specific language (DSL) for describing software behavior that allows non-technical people to understand test specifications. SpecFormula uses Gherkin as the foundation for its specification language.
+
+> This content is based on the [Cucumber Gherkin Reference](https://cucumber.io/docs/gherkin/reference/). Thanks to the Cucumber team for their open-source contribution.
+
+## Basic Structure
+
+A Gherkin file (`.feature`) contains one **Feature**, which defines multiple **Scenarios**:
+
+```gherkin
+Feature: Shopping Cart Checkout
+
+  Scenario: Empty cart cannot checkout
+    Given the shopping cart is empty
+    When the user clicks checkout
+    Then display error message "No items in cart"
+```
+
+## Core Keywords
+
+### Feature
+
+Each `.feature` file can only have one `Feature`, used to describe the functionality being tested:
+
+```gherkin
+Feature: Member Login
+  As a website member
+  I want to be able to log in
+  So that I can access my personal data
+```
+
+### Scenario / Example
+
+`Scenario` (or `Example`) describes a specific test case:
+
+```gherkin
+Scenario: Successful login with correct credentials
+  Given an account exists "alice@test.com"
+  When logging in with "alice@test.com" and correct password
+  Then login succeeds
+```
+
+### Given / When / Then
+
+These three keywords form the core structure of a test:
+
+| Keyword | Purpose | Description |
+|---------|---------|-------------|
+| `Given` | Precondition | Establishes the initial state of the test |
+| `When` | Action | Describes the user or system operation |
+| `Then` | Expected Result | Verifies the result after the operation |
+
+### And / But
+
+When there are multiple consecutive `Given`, `When`, or `Then` steps, use `And` or `But` to improve readability:
+
+```gherkin
+Scenario: Account locked after failed logins
+  Given an account exists "alice@test.com"
+  And the account has entered wrong password 4 times consecutively
+  When logging in with wrong password
+  Then login fails
+  And account is locked for 30 minutes
+```
+
+## Advanced Structures
+
+### Background
+
+`Background` defines shared setup steps executed before each Scenario:
+
+```gherkin
+Feature: Order Management
+
+  Background:
+    Given system time is "2026-01-15T09:00:00"
+    And an admin account exists
+
+  Scenario: Query today's orders
+    When admin queries today's orders
+    Then return today's order list
+
+  Scenario: Export order report
+    When admin exports order report
+    Then download CSV file
+```
+
+### Rule
+
+`Rule` groups related Scenarios to describe a specific business rule:
+
+```gherkin
+Feature: Discount Calculation
+
+  Rule: $100 off for every $1000 spent
+    Example: $1000 purchase gets $100 off
+      Given cart total is $1000
+      When calculating discount
+      Then discount amount is $100
+
+    Example: $999 purchase gets no discount
+      Given cart total is $999
+      When calculating discount
+      Then discount amount is $0
+```
+
+### Scenario Outline + Examples
+
+Use `Scenario Outline` with `Examples` table to run the same scenario with different data:
+
+```gherkin
+Scenario Outline: Password strength validation
+  When entering password "<password>"
+  Then strength level is "<level>"
+
+  Examples:
+    | password     | level  |
+    | 123          | weak   |
+    | abc123       | medium |
+    | Abc123!@#    | strong |
+```
+
+### Tags
+
+Use `@` tags to categorize or filter tests:
+
+```gherkin
+@smoke @login
+Feature: Member Login
+
+  @happy-path
+  Scenario: Successful login with correct credentials
+    ...
+
+  @error-handling
+  Scenario: Failed login with wrong password
+    ...
+```
+
+## Data Table
+
+Pass structured data to steps:
+
+```gherkin
+Given prepare the following products:
+  | name   | price | stock |
+  | Apple  | 30    | 100   |
+  | Banana | 20    | 50    |
+```
+
+## Doc String
+
+Pass multi-line text content:
+
+```gherkin
+Given system returns the following JSON:
+  """json
+  {
+    "status": "success",
+    "message": "Operation completed"
+  }
+  """
+```
+
+## Further Reading
+
+- [Cucumber Official Documentation](https://cucumber.io/docs/gherkin/)
+- [SpecFormula ISA Instructions](/docs/gherkin/isa/backend/instructions)

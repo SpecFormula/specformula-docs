@@ -1,0 +1,64 @@
+---
+title: Symbol System Overview
+description: The three symbol systems of SpecFormula ISA
+---
+
+SpecFormula provides three symbol systems that let you express variables, constraints, and time in Gherkin.
+
+## Symbol Systems
+
+| Symbol System | Purpose | Syntax Example |
+|---------------|---------|----------------|
+| [VAR](/docs/gherkin/isa/backend/symbols/var) | Variable extraction and reference | `>contextKey`, `$variable` |
+| [CAS](/docs/gherkin/isa/backend/symbols/cas) | Constraint assertions | `&isNum`, `&gt(100)` |
+| [TIME](/docs/gherkin/isa/backend/symbols/time) | Time expressions | `@time(now)`, `@date(2025-12-25)` |
+
+## Quick Reference
+
+### VAR-System
+
+```gherkin
+# Extract variable
+| >todo1.id | title    |
+| <todoId   | Buy milk |
+
+# Reference variable
+| todoId    |
+| $todo1.id |
+
+# String interpolation
+| Q:ids                     |
+| ${user1.id},${user2.id}   |
+```
+
+### CAS-System
+
+```gherkin
+# Type check
+| id     | name   |
+| &isNum | &isStr |
+
+# Numeric range
+| age              | price       |
+| &between(18, 65) | &gt(1000)   |
+
+# Time validation
+| createdAt                        |
+| &sameTime("2026-01-27T10:00:00") |
+```
+
+### TIME-System
+
+```gherkin
+# Absolute time
+| eventTime                    |
+| @time("2025-12-25T14:30:00") |
+
+# Relative time
+| dueDate        |
+| @time(now+7d)  |
+
+# Date only
+| birthday             |
+| @date("2000-01-15")  |
+```

@@ -1,0 +1,159 @@
+---
+title: CAS-System
+description: Declarative constraint assertions
+---
+
+CAS-System (Constraint Assertion System) lets you express validation logic with declarative syntax, replacing traditional imperative assertion code.
+
+## Basic Syntax
+
+```
+&constraintName                    # No parameter
+&constraintName(parameter)         # Single parameter
+&constraintName(param1, param2)    # Multiple parameters
+&constraint1 &constraint2          # Multiple constraints (AND)
+```
+
+## Usage Positions
+
+### DataTable Format
+
+```gherkin
+Then response, with table:
+  | id     | name             | age             |
+  | &isNum | &contains("Wang") | &between(18,65) |
+```
+
+### DocString JSON Format
+
+```gherkin
+Then response, with JSON:
+  """json
+  {
+    "id": "&isNum &gt(0)",
+    "name": "&isStr &contains(Wang)"
+  }
+  """
+```
+
+## Constraint List
+
+### Type Checks
+
+| Constraint | Meaning |
+|------------|---------|
+| `&isNum` | Is numeric |
+| `&isStr` | Is string |
+| `&isBool` | Is boolean |
+| `&isNull` | Is null |
+| `&isNotNull` | Is not null |
+
+### Numeric Comparisons
+
+| Constraint | Meaning | Example |
+|------------|---------|---------|
+| `&eq(value)` | Equals | `&eq(100)` |
+| `&ne(value)` | Not equals | `&ne(0)` |
+| `&gt(value)` | Greater than | `&gt(0)` |
+| `&lt(value)` | Less than | `&lt(100)` |
+| `&ge(value)` | Greater than or equal | `&ge(18)` |
+| `&le(value)` | Less than or equal | `&le(65)` |
+
+### String Operations
+
+| Constraint | Example |
+|------------|---------|
+| `&contains(substring)` | `&contains("Wang")` |
+| `&startsWith(prefix)` | `&startsWith("Mr.")` |
+| `&endsWith(suffix)` | `&endsWith(".com")` |
+| `&matches(regex)` | `&matches("\\d{4}-\\d{2}-\\d{2}")` |
+| `&length(min,max)` | `&length(2,10)` |
+
+### Array Operations
+
+| Constraint | Example |
+|------------|---------|
+| `&hasItem(item)` | `&hasItem("admin")` |
+| `&hasNoItem(item)` | `&hasNoItem("guest")` |
+| `&size(count)` | `&size(5)` |
+| `&isEmpty` | `&isEmpty` |
+| `&isNotEmpty` | `&isNotEmpty` |
+
+### Existence Checks
+
+| Constraint | Example |
+|------------|---------|
+| `&hasField(fieldName)` | `&hasField("createdAt")` |
+| `&noField(fieldName)` | `&noField("password")` |
+
+### Range Checks
+
+| Constraint | Example |
+|------------|---------|
+| `&between(min,max)` | `&between(18,65)` |
+| `&notBetween(min,max)` | `&notBetween(0,17)` |
+| `&oneOf(val1,val2,...)` | `&oneOf("admin","user")` |
+| `&noneOf(val1,val2,...)` | `&noneOf("banned")` |
+
+### Time Related
+
+| Constraint | Example |
+|------------|---------|
+| `&sameTime(datetime)` | `&sameTime("2025-11-04T08:00:00")` |
+| `&before(datetime)` | `&before("2025-12-31")` |
+| `&after(datetime)` | `&after("2025-01-01")` |
+| `&sameDay(date)` | `&sameDay("2025-11-04")` |
+| `&timeRange(start,end)` | `&timeRange("09:00","17:00")` |
+| `&withinDays(days)` | `&withinDays(7)` |
+
+## Multiple Constraint Combination
+
+Multiple constraints separated by spaces form an AND relationship:
+
+```gherkin
+| field | &isNum &gt(0) &lt(100) &ne(50) |
+# Must simultaneously: be numeric, greater than 0, less than 100, not equal to 50
+```
+
+## With Variables
+
+CAS parameters can reference variables:
+
+```gherkin
+| &eq($expectedValue)    |  # Use variable as comparison value
+| &gt($minThreshold)     |  # Dynamic lower bound
+| &between($min, $max)   |  # Dynamic range
+```
+
+## Usage Restrictions
+
+CAS cannot be mixed with `>contextKey` in the same column:
+
+```gherkin
+# ❌ Wrong: same column has both extraction (>) and validation (&)
+| >recordId |
+| &isNum    |
+
+# ✅ Correct: use separately
+When punch, call table:
+  | >recordId |
+  | <id       |
+
+Then response, with table:
+  | recordId              |
+  | &eq($recordId) &isNum |
+```
+
+## Complete Example
+
+```gherkin
+Feature: Order Validation
+
+  Example: Validate order response
+    When (UID="$Alice.id") create order, call table:
+      | >order1.id | productId | quantity |
+      | <orderId   | 123       | 2        |
+    Then create order(201) response, with table:
+      | orderId       | status                     | amount     | createdAt                        |
+      | &isNum &gt(0) | &oneOf("pending","active") | &ge(1000)  | &sameTime("2026-01-27T10:00:00") |
+```

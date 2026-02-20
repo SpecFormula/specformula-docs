@@ -1,0 +1,133 @@
+---
+title: EntityValidate
+description: Validate database record existence and correctness
+---
+
+EntityValidate lets you validate database records directly in Gherkin, ensuring data is actually written rather than just relying on correct API responses.
+
+## Basic Usage
+
+```gherkin
+And should exist a todo, with table:
+  | todoId    | userId    | title    | completed |
+  | $todo1.id | $Alice.id | Buy milk | false     |
+```
+
+This syntax will:
+1. Query the `todos` table using `todoId` as primary key
+2. Validate each field value matches the expected value
+
+## Why Validate the Database?
+
+ResponseValidate only validates API responses, it cannot confirm whether data is actually written to the database:
+
+```gherkin
+# API response might be correct, but database might not have the data
+Then create todo(201) response, with table:
+  | todoId    | title    |
+  | $todo1.id | Buy milk |
+
+# Query database directly to ensure data persistence is correct
+And should exist a todo, with table:
+  | todoId    | title    |
+  | $todo1.id | Buy milk |
+```
+
+## Lookup Strategies
+
+EntityValidate supports three query approaches:
+
+### 1. PK Query (Priority)
+
+Provide the complete primary key:
+
+```gherkin
+| todoId    | title    |
+| $todo1.id | Buy milk |
+```
+
+### 2. Probe Query
+
+When PK is missing, use provided fields as query conditions:
+
+```gherkin
+| userId    | status | title    |
+| $Alice.id | ACTIVE | Buy milk |
+```
+
+### 3. CAS Post-Filtering
+
+When Probe returns multiple results, use CAS constraints to filter:
+
+```gherkin
+| userId    | status | createdAt                        |
+| $Alice.id | ACTIVE | &sameTime("2026-01-27T10:00:00") |
+```
+
+## Field Name Conversion
+
+DataTable uses camelCase, the framework automatically maps to database snake_case:
+
+```
+DataTable: totalAmount → DB: total_amount
+DataTable: orderDate   → DB: order_date
+```
+
+## Type Conversion
+
+The framework automatically performs semantic comparison:
+
+| Comparison Type | Description |
+|-----------------|-------------|
+| Numeric | `50000.00 == 50000` (precision-safe comparison) |
+| Time | Truncated to seconds, ignores millisecond differences |
+
+## CAS Constraints
+
+CAS constraints can be used during validation:
+
+```gherkin
+And should exist a product, with table:
+  | id | name  | price      | stock      | deletedAt |
+  | 1  | Phone | &gt(10000) | &lte(1000) | &isNull   |
+```
+
+## Error Handling
+
+### Lint Phase
+
+| Error | Description |
+|-------|-------------|
+| Entity not defined | Not found in `entity_to_table_mapping` |
+| Field not found | Field not found in table definition |
+
+### Runtime
+
+| Error | Description |
+|-------|-------------|
+| Record not found | Query result is empty |
+| Field value mismatch | Field value doesn't match expected |
+| Multiple results | Probe returned multiple rows and cannot filter to unique |
+
+## Complete Example
+
+```gherkin
+Feature: Create Todo
+
+  Background:
+    Given current time is "2026-01-27T10:00:00"
+    Given prepare a user, with table:
+      | >Alice.id | name  | email             | status |
+      | <userId   | Alice | alice@example.com | ACTIVE |
+
+  Example: Validate todo written to database
+    When (UID="$Alice.id") create todo, call table:
+      | >todo1.id | title    | description    |
+      | <todoId   | Buy milk | Go to Costco   |
+    Then create todo(201) response, with table:
+      | todoId    | title    |
+      | $todo1.id | Buy milk |
+    And should exist a todo, with table:
+      | todoId    | userId    | title    | description  | completed | createdAt                        |
+      | $todo1.id | $Alice.id | Buy milk | Go to Costco | false     | &sameTime("2026-01-27T10:00:00") |
+```

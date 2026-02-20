@@ -1,0 +1,145 @@
+---
+title: ResponseValidate
+description: Validate HTTP API response correctness
+---
+
+ResponseValidate lets you validate both HTTP status code and response content in a single step, supporting both DataTable and JSON formats.
+
+## Basic Usage
+
+```gherkin
+Then create todo(201) response, with table:
+  | >todo1.id | userId    | title    | completed |
+  | <todoId   | $Alice.id | Buy milk | false     |
+```
+
+This syntax will:
+1. Validate HTTP status code is `201`
+2. Validate field values in the response JSON
+3. Extract `todoId` from response and store in variable `todo1.id`
+
+## Two Formats
+
+| Format | Use Case |
+|--------|----------|
+| DataTable | Field-level validation, supports variable extraction |
+| DocString JSON | Complete JSON structure validation |
+
+### DataTable Format
+
+```gherkin
+Then get todo(200) response, with table:
+  | todoId    | title    | completed |
+  | $todo1.id | Buy milk | false     |
+```
+
+### JSON Format
+
+```gherkin
+Then get todo(200) response, with JSON:
+  """json
+  {
+    "todoId": "$todo1.id",
+    "title": "Buy milk",
+    "completed": false
+  }
+  """
+```
+
+## Nested Paths
+
+Supports dot notation and array indexing for nested JSON validation:
+
+```gherkin
+Then get order(200) response, with table:
+  | data.order.id | data.items[0].name | data.items[1].name |
+  | $order1.id    | Product A          | Product B          |
+```
+
+## Variable Extraction
+
+Use `>` and `<` pairs to extract values from the response:
+
+```gherkin
+Then login(200) response, with table:
+  | >userToken | >userId |
+  | <token     | <id     |
+```
+
+## Variable Reference
+
+Use `$variable` to reference previously stored variables for comparison:
+
+```gherkin
+Then get user(200) response, with table:
+  | userId    | name  |
+  | $Alice.id | Alice |
+```
+
+## CAS Constraint Validation
+
+Use CAS constraints for flexible validation:
+
+```gherkin
+Then get order(200) response, with table:
+  | orderId  | amount     | status                     | createdAt                        |
+  | &isNum   | &gt(1000)  | &oneOf("pending","active") | &sameTime("2026-01-27T10:00:00") |
+```
+
+Common constraints:
+- `&isNum`, `&isStr`, `&isNull` — type checks
+- `&gt()`, `&lt()`, `&between()` — numeric ranges
+- `&contains()`, `&startsWith()` — string matching
+- `&sameTime()` — time comparison
+
+See [CAS Symbols](/docs/gherkin/isa/backend/symbols/cas) for the complete constraint list.
+
+## Validation Flow
+
+ResponseValidate executes four validation layers in sequence:
+
+1. **HTTP Status Code**: Fails immediately if status code doesn't match
+2. **JSON Structure Comparison**: Recursively compares JSON nodes
+3. **Value-Level Validation**: Numeric comparison, CAS constraints, variable resolution
+4. **Schema Validation**: Checks types against OpenAPI definitions
+
+## Error Handling
+
+### Lint Phase
+
+| Error | Description |
+|-------|-------------|
+| Field not found | Field name not found in Response Schema |
+| Extract field not found | Field specified with `<` not found in Response Schema |
+
+### Runtime
+
+| Error | Description |
+|-------|-------------|
+| Status code mismatch | Actual status code differs from expected |
+| Field value mismatch | Field value doesn't match expected |
+| JSON structure mismatch | Array length or object fields don't match |
+| Schema validation failed | Doesn't conform to OpenAPI Schema definition |
+
+## Complete Example
+
+```gherkin
+Feature: Update Todo
+
+  Background:
+    Given current time is "2026-01-27T10:00:00"
+    Given prepare a user, with table:
+      | >Alice.id | name  | email             | status |
+      | <userId   | Alice | alice@example.com | ACTIVE |
+
+  Example: Update todo title
+    When (UID="$Alice.id") create todo, call table:
+      | >todo1.id | title    |
+      | <todoId   | Buy milk |
+    When (UID="$Alice.id") update todo, call table:
+      | P:todoId  | title        |
+      | $todo1.id | Buy soy milk |
+    Then update todo(200) response, with table:
+      | todoId    | title        | completed | updatedAt                        |
+      | $todo1.id | Buy soy milk | false     | &sameTime("2026-01-27T10:00:00") |
+```

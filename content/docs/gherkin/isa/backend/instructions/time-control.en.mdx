@@ -1,0 +1,120 @@
+---
+title: TimeControl
+description: Control mock time in tests
+---
+
+TimeControl lets you freeze or control time in tests, ensuring stability of time-dependent tests.
+
+## Basic Usage
+
+```gherkin
+Given current time is "2026-01-27T10:00:00"
+```
+
+This syntax will:
+1. Set mock time to `2026-01-27T10:00:00`
+2. All subsequent `@time(now)` expressions will use this time
+
+## Why Control Time?
+
+Without TimeControl, tests depend on the system clock, producing different results at different times:
+
+```gherkin
+# ❌ Without TimeControl: only passes at specific times
+Then create todo(201) response, with table:
+  | createdAt                        |
+  | &sameTime("2026-02-12T10:00:00") |
+
+# ✅ With TimeControl: passes regardless of when executed
+Given current time is "2026-02-01T10:00:00"
+Then create todo(201) response, with table:
+  | createdAt                        |
+  | &sameTime("2026-02-01T10:00:00") |
+```
+
+## Supported Time Formats
+
+| Format | Example |
+|--------|---------|
+| Date only | `2025-12-25` (defaults to 00:00:00) |
+| ISO without timezone | `2025-11-04T08:00:00` (uses system timezone) |
+| ISO with timezone | `2025-12-25T14:30:00+08:00` |
+| ISO UTC | `2025-12-25T06:30:00Z` |
+| Relative time | `@time(now-1d)`, `@time(now+2h)` |
+
+## Relative Time
+
+Relative time is calculated based on the current mock time:
+
+```gherkin
+Given current time is "2025-11-04T08:00:00"    # Baseline
+Given current time is "@time(now-1d)"          # → 2025-11-03T08:00:00
+Given current time is "@time(now+3h)"          # → 2025-11-03T11:00:00
+```
+
+### Time Units
+
+| Unit | Symbol | Example |
+|------|--------|---------|
+| Seconds | `s` | `now-30s` |
+| Minutes | `m` | `now+5m` |
+| Hours | `h` | `now-2h` |
+| Days | `d` | `now+7d` |
+| Months | `M` (uppercase) | `now-1M` |
+
+### Compound Relative Time
+
+```gherkin
+Given current time is "@time(now-1M-1d+3h)"
+```
+
+## Scope of Effect
+
+Mock time set by TimeControl affects all subsequent instructions:
+
+| Instruction | Affected Behavior |
+|-------------|-------------------|
+| ApiCall | `@time(now)` uses mock time |
+| EntitySetup | `@time(now)` used for data insertion |
+| EntityValidate | `@time(now)` used for validation comparison |
+
+## Error Handling
+
+### Runtime
+
+| Error | Description |
+|-------|-------------|
+| Missing time parameter | Time expression is empty |
+| Unable to parse | Time format doesn't match supported formats |
+
+## Complete Example
+
+```gherkin
+Feature: Todo Time Control
+
+  Background:
+    Given current time is "2026-01-27T10:00:00"
+    Given prepare a user, with table:
+      | >Alice.id | name  | email             | status |
+      | <userId   | Alice | alice@example.com | ACTIVE |
+
+  Example: Create then advance time and update
+    # 1. Create todo (createdAt = 2026-01-27T10:00:00)
+    When (UID="$Alice.id") create todo, call table:
+      | >todo1.id | title    |
+      | <todoId   | Buy milk |
+    Then create todo(201) response, with table:
+      | todoId    | createdAt                        |
+      | $todo1.id | &sameTime("2026-01-27T10:00:00") |
+
+    # 2. Advance time by 1 day
+    Given current time is "@time(now+1d)"
+
+    # 3. Update todo (updatedAt = 2026-01-28T10:00:00)
+    When (UID="$Alice.id") update todo, call table:
+      | P:todoId  | title        |
+      | $todo1.id | Buy soy milk |
+    Then update todo(200) response, with table:
+      | todoId    | updatedAt                        |
+      | $todo1.id | &sameTime("2026-01-28T10:00:00") |
+```

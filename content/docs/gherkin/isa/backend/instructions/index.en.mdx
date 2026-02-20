@@ -1,0 +1,30 @@
+---
+title: Instructions Overview
+description: All instructions supported by SpecFormula ISA
+---
+
+Instructions are the core components of SpecFormula test specifications, with each instruction corresponding to a specific test operation.
+
+## Available Instructions
+
+| Instruction | Purpose |
+|-------------|---------|
+| [ApiCall](/docs/gherkin/isa/backend/instructions/api-call) | Execute HTTP API requests |
+| [EntitySetup](/docs/gherkin/isa/backend/instructions/entity-setup) | Prepare test data (INSERT) |
+| [ResponseValidate](/docs/gherkin/isa/backend/instructions/response-validate) | Validate API responses |
+| [EntityValidate](/docs/gherkin/isa/backend/instructions/entity-validate) | Validate database record exists |
+| [EntityNonExistenceValidate](/docs/gherkin/isa/backend/instructions/entity-non-existence-validate) | Validate database record does not exist |
+| [TimeControl](/docs/gherkin/isa/backend/instructions/time-control) | Control mock time |
+
+## Mapping Instructions to Gherkin
+
+Instructions are mapped to Gherkin Step text through regular expressions defined in `isa.yml`:
+
+```yaml
+instructions:
+  - name: API call
+    format: ^\((?:No Actor|UID="(?P<userId>\$[\w.]+)")\) (?P<summary>.+?), call table:$
+    instruction_type: api_call
+```
+
+When a Gherkin Step matches the regular expression, the framework executes the corresponding instruction logic.

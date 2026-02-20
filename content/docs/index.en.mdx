@@ -1,0 +1,42 @@
+---
+title: SpecFormula ISA
+description: Declarative BDD Test Specification Language
+---
+
+**SpecFormula ISA** (Instruction Set Architecture) is a declarative BDD test specification language that allows you to perform API calls, data setup, and validation directly in Gherkin, without writing Step Definition code.
+
+## Core Advantages
+
+- **Spec as Test**: Test logic is written directly in Gherkin specs, no longer scattered across code
+- **Automation-Driven**: Automatically identifies API and database table structures via OpenAPI Spec and DDL
+- **Type-Safe**: Time expressions and variable references have complete type protection
+
+## Quick Start
+
+```gherkin
+Feature: Create Todo Item
+
+  Background:
+    Given current time is "2026-01-27T10:00:00"
+    Given prepare a user, with table:
+      | >Alice.id | name  | email             |
+      | <userId   | Alice | alice@example.com |
+
+  Example: Create a todo item
+    When (UID="$Alice.id") create todo item, call table:
+      | >todo1.id | title    |
+      | <todoId   | Buy milk |
+    Then create todo item(201) response, with table:
+      | todoId    | title    | completed |
+      | $todo1.id | Buy milk | false     |
+```
+
+## Documentation Structure
+
+<Cards>
+  <Card title="Gherkin DSL" href="/docs/gherkin/dsl" />
+  <Card title="The Three Specs" href="/docs/gherkin/isa/backend/three-specs" />
+  <Card title="Configuration" href="/docs/gherkin/isa/backend/config" />
+  <Card title="Instructions" href="/docs/gherkin/isa/backend/instructions" />
+  <Card title="Symbol System" href="/docs/gherkin/isa/backend/symbols" />
+</Cards>

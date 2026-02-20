@@ -1,0 +1,136 @@
+---
+title: TIME-System
+description: Time expression parsing
+---
+
+TIME-System provides three functions that convert declarative time expressions into type-safe time objects.
+
+## Three Functions
+
+| Function | Purpose | Java Type | C# Type |
+|----------|---------|-----------|---------|
+| `@time(expr)` | Full datetime | `ZonedDateTime` | `DateTimeOffset` |
+| `@date(expr)` | Date only | `LocalDate` | `DateOnly` |
+| `@localtime(expr)` | Time only | `LocalTime` | `TimeOnly` |
+
+## Absolute Time
+
+```gherkin
+# ISO 8601 format
+@time("2025-11-04T08:00:00")
+@time("2025-11-04T08:00:00+08:00")
+@time("2025-11-04T08:00:00Z")
+
+# Date only (defaults to 00:00:00)
+@time("2025-11-04")
+
+# Date function
+@date("2025-11-04")
+@date("2025/12/16")
+
+# Time function
+@localtime("21:00")
+@localtime("21:00:30")
+```
+
+## Relative Time
+
+Calculated based on current (or mock) time:
+
+```gherkin
+@time("now")         # Current time
+@time("now-1d")      # Yesterday
+@time("now+1h")      # One hour later
+@time("now-1M-1d")   # One month and one day ago
+```
+
+### Time Units
+
+| Unit | Symbol | Example |
+|------|--------|---------|
+| Seconds | `s` (lowercase) | `now-30s` |
+| Minutes | `m` (lowercase) | `now+5m` |
+| Hours | `h` (lowercase) | `now-2h` |
+| Days | `d` (lowercase) | `now+7d` |
+| Months | `M` (uppercase) | `now-1M` |
+
+## With Mock Time
+
+When mock time is set via [TimeControl](/docs/gherkin/isa/backend/instructions/time-control), `now` uses the mock time:
+
+```gherkin
+Given current time is "2026-02-01T10:00:00"
+When create log, call table:
+  | logTime       |
+  | @time(now-1d) |    # → 2026-01-31T10:00:00
+```
+
+## Timezone Handling
+
+| Input Format | Timezone Behavior |
+|--------------|-------------------|
+| `2025-11-04T08:00:00+08:00` | Uses specified timezone |
+| `2025-11-04T08:00:00Z` | Uses UTC |
+| `2025-11-04T08:00:00` | Uses system default timezone |
+
+## Type Safety
+
+TIME-System returns the correct time type, not strings:
+
+```gherkin
+# ❌ Plain string, no type guarantee
+| eventTime           |
+| 2025-11-04T08:00:00 |
+
+# ✅ Returns ZonedDateTime, correct type
+| eventTime                    |
+| @time("2025-11-04T08:00:00") |
+```
+
+## Usage Restrictions
+
+TIME-System cannot be used directly with VAR extraction keys:
+
+```gherkin
+# ❌ Not supported
+| >eventTime                   |
+| @time("2026-01-15T09:00:00") |
+
+# ✅ Correct: extract from execution result
+| >eventTime |
+| <createdAt |
+```
+
+## Error Handling
+
+Throws a clear exception on parse failure:
+
+```
+Unable to parse time expression: @time("invalid").
+Supported formats: ISO 8601 (2025-11-04T08:00:00), date (2025-11-04), relative time (now, now-1d)
+```
+
+## Complete Example
+
+```gherkin
+Feature: Time Expressions
+
+  Background:
+    Given current time is "2026-01-27T10:00:00"
+
+  Example: Using various time expressions
+    # Absolute time
+    Given prepare an event, with table:
+      | name    | startTime                    |
+      | Meeting | @time("2026-01-28T14:00:00") |
+
+    # Relative time
+    Given prepare a task, with table:
+      | name   | dueDate        |
+      | Report | @time(now+7d)  |
+
+    # Date only
+    Given prepare a user, with table:
+      | name  | birthday            |
+      | Alice | @date("2000-01-15") |
+```
