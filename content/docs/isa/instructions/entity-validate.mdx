@@ -1,0 +1,133 @@
+---
+title: EntityValidate
+description: 驗證資料庫記錄的存在性與正確性
+---
+
+EntityValidate 讓你直接在 Gherkin 中驗證資料庫記錄，確保資料真正寫入而非只是 API 回傳正確。
+
+## 基本用法
+
+```gherkin
+And 應該存在一個待辦事項, with table:
+  | todoId    | userId    | title  | completed |
+  | $todo1.id | $Alice.id | 買牛奶 | false     |
+```
+
+這段語法會：
+1. 以 `todoId` 作為主鍵查詢 `todos` 資料表
+2. 逐欄位驗證實際值是否符合預期
+
+## 為什麼需要驗證資料庫？
+
+ResponseValidate 只驗證 API 回應，無法確認資料是否真正寫入資料庫：
+
+```gherkin
+# API 回應可能正確，但資料庫可能沒寫入
+Then 新增待辦事項(201)回應, with table:
+  | todoId    | title  |
+  | $todo1.id | 買牛奶 |
+
+# 直接查資料庫，確保資料持久化正確
+And 應該存在一個待辦事項, with table:
+  | todoId    | title  |
+  | $todo1.id | 買牛奶 |
+```
+
+## 查找策略
+
+EntityValidate 支援三種查詢方式：
+
+### 1. PK 查詢（優先）
+
+提供完整主鍵：
+
+```gherkin
+| todoId    | title  |
+| $todo1.id | 買牛奶 |
+```
+
+### 2. Probe 查詢
+
+缺少 PK 時，使用提供的欄位作為查詢條件：
+
+```gherkin
+| userId    | status | title  |
+| $Alice.id | ACTIVE | 買牛奶 |
+```
+
+### 3. CAS 後過濾
+
+Probe 回傳多筆結果時，用 CAS 約束篩選：
+
+```gherkin
+| userId    | status | createdAt                       |
+| $Alice.id | ACTIVE | &sameTime("2026-01-27T10:00:00") |
+```
+
+## 欄位名稱轉換
+
+DataTable 使用 camelCase，框架自動對應資料庫的 snake_case：
+
+```
+DataTable: totalAmount → DB: total_amount
+DataTable: orderDate   → DB: order_date
+```
+
+## 型別轉換
+
+框架自動進行語義比較：
+
+| 比較類型 | 說明 |
+|----------|------|
+| 數值 | `50000.00 == 50000`（精度安全比較） |
+| 時間 | 截斷至秒，忽略毫秒差異 |
+
+## CAS 約束
+
+驗證時可使用 CAS 約束：
+
+```gherkin
+And 應該存在一個商品, with table:
+  | id | name | price      | stock      | deletedAt |
+  | 1  | 手機 | &gt(10000) | &lte(1000) | &isNull   |
+```
+
+## 錯誤處理
+
+### Lint 階段
+
+| 錯誤 | 說明 |
+|------|------|
+| Entity 未定義 | `entity_to_table_mapping` 中找不到 |
+| 欄位不存在 | 欄位在資料表定義中找不到 |
+
+### 執行階段
+
+| 錯誤 | 說明 |
+|------|------|
+| 記錄不存在 | 查詢結果為空 |
+| 欄位值不匹配 | 欄位值與預期不符 |
+| 多筆結果 | Probe 回傳多筆且無法篩選唯一 |
+
+## 完整範例
+
+```gherkin
+Feature: 新增待辦事項
+
+  Background:
+    Given 現在時間為 "2026-01-27T10:00:00"
+    Given 準備一個使用者, with table:
+      | >Alice.id | name  | email             | status |
+      | <userId   | Alice | alice@example.com | ACTIVE |
+
+  Example: 驗證待辦事項寫入資料庫
+    When (UID="$Alice.id") 新增待辦事項, call table:
+      | >todo1.id | title  | description |
+      | <todoId   | 買牛奶 | 去全聯買    |
+    Then 新增待辦事項(201)回應, with table:
+      | todoId    | title  |
+      | $todo1.id | 買牛奶 |
+    And 應該存在一個待辦事項, with table:
+      | todoId    | userId    | title  | description | completed | createdAt                        |
+      | $todo1.id | $Alice.id | 買牛奶 | 去全聯買    | false     | &sameTime("2026-01-27T10:00:00") |
+```

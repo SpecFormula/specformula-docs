@@ -1,0 +1,120 @@
+---
+title: TimeControl
+description: 控制測試中的 Mock 時間
+---
+
+TimeControl 讓你凍結或控制測試中的時間，確保時間相依測試的穩定性。
+
+## 基本用法
+
+```gherkin
+Given 現在時間為 "2026-01-27T10:00:00"
+```
+
+這段語法會：
+1. 設定 Mock 時間為 `2026-01-27T10:00:00`
+2. 所有後續的 `@time(now)` 都會使用這個時間
+
+## 為什麼需要控制時間？
+
+沒有 TimeControl 時，測試依賴系統時鐘，不同時間執行會產生不同結果：
+
+```gherkin
+# ❌ 沒有 TimeControl：只有在特定時間執行才會通過
+Then 新增待辦事項(201)回應, with table:
+  | createdAt                        |
+  | &sameTime("2026-02-12T10:00:00") |
+
+# ✅ 有 TimeControl：無論何時執行都通過
+Given 現在時間為 "2026-02-01T10:00:00"
+Then 新增待辦事項(201)回應, with table:
+  | createdAt                        |
+  | &sameTime("2026-02-01T10:00:00") |
+```
+
+## 支援的時間格式
+
+| 格式 | 範例 |
+|------|------|
+| 純日期 | `2025-12-25`（預設 00:00:00） |
+| ISO 無時區 | `2025-11-04T08:00:00`（使用系統時區） |
+| ISO 含時區 | `2025-12-25T14:30:00+08:00` |
+| ISO UTC | `2025-12-25T06:30:00Z` |
+| 相對時間 | `@time(now-1d)`、`@time(now+2h)` |
+
+## 相對時間
+
+相對時間基於當前 Mock 時間計算：
+
+```gherkin
+Given 現在時間為 "2025-11-04T08:00:00"    # 基準
+Given 現在時間為 "@time(now-1d)"          # → 2025-11-03T08:00:00
+Given 現在時間為 "@time(now+3h)"          # → 2025-11-03T11:00:00
+```
+
+### 時間單位
+
+| 單位 | 符號 | 範例 |
+|------|------|------|
+| 秒 | `s` | `now-30s` |
+| 分 | `m` | `now+5m` |
+| 時 | `h` | `now-2h` |
+| 日 | `d` | `now+7d` |
+| 月 | `M`（大寫） | `now-1M` |
+
+### 複合相對時間
+
+```gherkin
+Given 現在時間為 "@time(now-1M-1d+3h)"
+```
+
+## 影響範圍
+
+TimeControl 設定的 Mock 時間影響所有後續指令：
+
+| 指令 | 受影響的行為 |
+|------|-------------|
+| ApiCall | `@time(now)` 使用 Mock 時間 |
+| EntitySetup | `@time(now)` 用於資料插入 |
+| EntityValidate | `@time(now)` 用於驗證比對 |
+
+## 錯誤處理
+
+### 執行階段
+
+| 錯誤 | 說明 |
+|------|------|
+| 缺少時間參數 | 時間表達式為空 |
+| 無法解析 | 時間格式不符合支援的格式 |
+
+## 完整範例
+
+```gherkin
+Feature: 待辦事項時間控制
+
+  Background:
+    Given 現在時間為 "2026-01-27T10:00:00"
+    Given 準備一個使用者, with table:
+      | >Alice.id | name  | email             | status |
+      | <userId   | Alice | alice@example.com | ACTIVE |
+
+  Example: 新增後推進時間再更新
+    # 1. 新增待辦事項（createdAt = 2026-01-27T10:00:00）
+    When (UID="$Alice.id") 新增待辦事項, call table:
+      | >todo1.id | title  |
+      | <todoId   | 買牛奶 |
+    Then 新增待辦事項(201)回應, with table:
+      | todoId    | createdAt                        |
+      | $todo1.id | &sameTime("2026-01-27T10:00:00") |
+
+    # 2. 推進時間 1 天
+    Given 現在時間為 "@time(now+1d)"
+
+    # 3. 更新待辦事項（updatedAt = 2026-01-28T10:00:00）
+    When (UID="$Alice.id") 更新待辦事項, call table:
+      | P:todoId  | title  |
+      | $todo1.id | 買豆漿 |
+    Then 更新待辦事項(200)回應, with table:
+      | todoId    | updatedAt                        |
+      | $todo1.id | &sameTime("2026-01-28T10:00:00") |
+```

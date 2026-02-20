@@ -1,0 +1,145 @@
+---
+title: ResponseValidate
+description: 驗證 HTTP API 回應的正確性
+---
+
+ResponseValidate 讓你在一個步驟中同時驗證 HTTP 狀態碼與回應內容，支援 DataTable 和 JSON 兩種格式。
+
+## 基本用法
+
+```gherkin
+Then 新增待辦事項(201)回應, with table:
+  | >todo1.id | userId    | title  | completed |
+  | <todoId   | $Alice.id | 買牛奶 | false     |
+```
+
+這段語法會：
+1. 驗證 HTTP 狀態碼為 `201`
+2. 驗證回應 JSON 中的欄位值
+3. 從回應中擷取 `todoId`，存入變數 `todo1.id`
+
+## 兩種格式
+
+| 格式 | 適用場景 |
+|------|----------|
+| DataTable | 欄位級驗證，支援變數擷取 |
+| DocString JSON | 完整 JSON 結構驗證 |
+
+### DataTable 格式
+
+```gherkin
+Then 查詢待辦事項(200)回應, with table:
+  | todoId    | title  | completed |
+  | $todo1.id | 買牛奶 | false     |
+```
+
+### JSON 格式
+
+```gherkin
+Then 查詢待辦事項(200)回應為, with JSON:
+  """json
+  {
+    "todoId": "$todo1.id",
+    "title": "買牛奶",
+    "completed": false
+  }
+  """
+```
+
+## 巢狀路徑
+
+支援 dot notation 和陣列索引驗證巢狀 JSON：
+
+```gherkin
+Then 查詢訂單(200)回應, with table:
+  | data.order.id | data.items[0].name | data.items[1].name |
+  | $order1.id    | 商品A              | 商品B              |
+```
+
+## 變數擷取
+
+使用 `>` 和 `<` 配對從回應中擷取值：
+
+```gherkin
+Then 登入(200)回應, with table:
+  | >userToken | >userId |
+  | <token     | <id     |
+```
+
+## 引用變數
+
+使用 `$variable` 引用先前儲存的變數進行比對：
+
+```gherkin
+Then 查詢使用者(200)回應, with table:
+  | userId    | name  |
+  | $Alice.id | Alice |
+```
+
+## CAS 約束驗證
+
+使用 CAS 約束進行彈性驗證：
+
+```gherkin
+Then 查詢訂單(200)回應, with table:
+  | orderId  | amount     | status                     | createdAt                        |
+  | &isNum   | &gt(1000)  | &oneOf("pending","active") | &sameTime("2026-01-27T10:00:00") |
+```
+
+常用約束：
+- `&isNum`、`&isStr`、`&isNull` — 型別檢查
+- `&gt()`、`&lt()`、`&between()` — 數值範圍
+- `&contains()`、`&startsWith()` — 字串匹配
+- `&sameTime()` — 時間比對
+
+完整約束清單請參考 [CAS 符號](/docs/isa/symbols/cas)。
+
+## 驗證流程
+
+ResponseValidate 依序執行四層驗證：
+
+1. **HTTP Status Code**：狀態碼不匹配則直接失敗
+2. **JSON 結構比對**：遞迴比較 JSON 節點
+3. **值層驗證**：數值比較、CAS 約束、變數解析
+4. **Schema 驗證**：對照 OpenAPI 定義檢查型別
+
+## 錯誤處理
+
+### Lint 階段
+
+| 錯誤 | 說明 |
+|------|------|
+| 欄位不存在 | 欄位名稱在 Response Schema 中找不到 |
+| 擷取欄位不存在 | `<` 指定的欄位在 Response Schema 中找不到 |
+
+### 執行階段
+
+| 錯誤 | 說明 |
+|------|------|
+| 狀態碼不匹配 | 實際狀態碼與預期不符 |
+| 欄位值不匹配 | 欄位值與預期不一致 |
+| JSON 結構不匹配 | 陣列長度、物件欄位不符 |
+| Schema 驗證失敗 | 不符合 OpenAPI Schema 定義 |
+
+## 完整範例
+
+```gherkin
+Feature: 更新待辦事項
+
+  Background:
+    Given 現在時間為 "2026-01-27T10:00:00"
+    Given 準備一個使用者, with table:
+      | >Alice.id | name  | email             | status |
+      | <userId   | Alice | alice@example.com | ACTIVE |
+
+  Example: 更新待辦事項標題
+    When (UID="$Alice.id") 新增待辦事項, call table:
+      | >todo1.id | title  |
+      | <todoId   | 買牛奶 |
+    When (UID="$Alice.id") 更新待辦事項, call table:
+      | P:todoId  | title  |
+      | $todo1.id | 買豆漿 |
+    Then 更新待辦事項(200)回應, with table:
+      | todoId    | title  | completed | updatedAt                        |
+      | $todo1.id | 買豆漿 | false     | &sameTime("2026-01-27T10:00:00") |
+```

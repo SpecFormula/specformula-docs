@@ -1,0 +1,29 @@
+---
+title: 指令總覽
+description: SpecFormula ISA 支援的所有指令
+---
+
+指令是 SpecFormula 測試規格的核心組成，每個指令對應一種測試操作。
+
+## 可用指令
+
+| 指令 | 用途 |
+|------|------|
+| [ApiCall](/docs/isa/instructions/api-call) | 執行 HTTP API 請求 |
+| [EntitySetup](/docs/isa/instructions/entity-setup) | 準備測試資料（INSERT） |
+| [ResponseValidate](/docs/isa/instructions/response-validate) | 驗證 API 回應 |
+| [EntityValidate](/docs/isa/instructions/entity-validate) | 驗證資料庫記錄存在 |
+| [TimeControl](/docs/isa/instructions/time-control) | 控制 Mock 時間 |
+
+## 指令與 Gherkin 的對應
+
+指令透過 `isa.yml` 中的正則表達式與 Gherkin Step 文字對應：
+
+```yaml
+instructions:
+  - name: API call
+    format: ^\((?:No Actor|UID="(?P<userId>\$[\w.]+)")\) (?P<summary>.+?), call table:$
+    instruction_type: api_call
+```
+
+當 Gherkin Step 匹配正則表達式時，框架會執行對應的指令邏輯。

@@ -1,0 +1,40 @@
+---
+title: SpecFormula ISA
+description: 宣告式 BDD 測試規格語言
+---
+
+**SpecFormula ISA**（Instruction Set Architecture）是一套宣告式的 BDD 測試規格語言，讓你直接在 Gherkin 中完成 API 呼叫、資料準備與驗證，無需撰寫 Step Definition 程式碼。
+
+## 核心優勢
+
+- **規格即測試**：測試邏輯直接寫在 Gherkin 規格中，不再散落於程式碼
+- **自動化驅動**：透過 OpenAPI Spec 和 DDL 自動識別 API 與資料表結構
+- **型別安全**：時間表達式、變數引用皆有完整的型別保護
+
+## 快速開始
+
+```gherkin
+Feature: 新增待辦事項
+
+  Background:
+    Given 現在時間為 "2026-01-27T10:00:00"
+    Given 準備一個使用者, with table:
+      | >Alice.id | name  | email             |
+      | <userId   | Alice | alice@example.com |
+
+  Example: 新增一筆待辦事項
+    When (UID="$Alice.id") 新增待辦事項, call table:
+      | >todo1.id | title  |
+      | <todoId   | 買牛奶 |
+    Then 新增待辦事項(201)回應, with table:
+      | todoId    | title  | completed |
+      | $todo1.id | 買牛奶 | false     |
+```
+
+## 文件結構
+
+<Cards>
+  <Card title="設定檔" href="/docs/isa/config" />
+  <Card title="指令" href="/docs/isa/instructions" />
+  <Card title="符號系統" href="/docs/isa/symbols" />
+</Cards>

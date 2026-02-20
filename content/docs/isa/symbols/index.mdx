@@ -1,0 +1,64 @@
+---
+title: 符號系統總覽
+description: SpecFormula ISA 的三大符號系統
+---
+
+SpecFormula 提供三套符號系統，讓你在 Gherkin 中表達變數、約束和時間。
+
+## 符號系統
+
+| 符號系統 | 用途 | 語法範例 |
+|----------|------|----------|
+| [VAR](/docs/isa/symbols/var) | 變數擷取與引用 | `>contextKey`、`$variable` |
+| [CAS](/docs/isa/symbols/cas) | 約束斷言 | `&isNum`、`&gt(100)` |
+| [TIME](/docs/isa/symbols/time) | 時間表達式 | `@time(now)`、`@date(2025-12-25)` |
+
+## 快速對照
+
+### VAR-System
+
+```gherkin
+# 擷取變數
+| >todo1.id | title  |
+| <todoId   | 買牛奶 |
+
+# 引用變數
+| todoId    |
+| $todo1.id |
+
+# 字串內插
+| Q:ids                     |
+| ${user1.id},${user2.id}   |
+```
+
+### CAS-System
+
+```gherkin
+# 型別檢查
+| id     | name   |
+| &isNum | &isStr |
+
+# 數值範圍
+| age              | price       |
+| &between(18, 65) | &gt(1000)   |
+
+# 時間驗證
+| createdAt                        |
+| &sameTime("2026-01-27T10:00:00") |
+```
+
+### TIME-System
+
+```gherkin
+# 絕對時間
+| eventTime                    |
+| @time("2025-12-25T14:30:00") |
+
+# 相對時間
+| dueDate        |
+| @time(now+7d)  |
+
+# 僅日期
+| birthday             |
+| @date("2000-01-15")  |
+```

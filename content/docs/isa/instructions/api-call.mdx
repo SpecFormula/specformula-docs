@@ -1,0 +1,151 @@
+---
+title: ApiCall
+description: 以宣告式語法執行 HTTP API 請求
+---
+
+ApiCall 讓你直接在 Gherkin 中宣告 API 呼叫的參數與回應擷取，無需撰寫 HTTP 請求的程式碼。
+
+## 基本用法
+
+```gherkin
+When (UID="$Alice.id") 新增待辦事項, call table:
+  | >todo1.id | title  |
+  | <todoId   | 買牛奶 |
+```
+
+這段語法會：
+1. 以 `$Alice.id` 作為呼叫者身份（Bearer Token）
+2. 呼叫 OpenAPI Spec 中 summary 為「新增待辦事項」的 API
+3. 將 `title: 買牛奶` 作為 Request Body
+4. 從回應中擷取 `todoId` 欄位，存入變數 `todo1.id`
+
+## 欄位語法
+
+DataTable 的欄位名稱支援特殊前綴，用於指定參數類型：
+
+| 前綴 | 用途 | 範例 |
+|------|------|------|
+| （無） | Request Body 欄位 | `title` |
+| `P:` | Path 參數 | `P:todoId` → 替換 URL 中的 `{todoId}` |
+| `Q:` | Query 參數 | `Q:page` → `?page=value` |
+| `H:` | HTTP Header | `H:X-Trace-Id` |
+| `>` | 擷取變數名稱 | `>todo1.id` |
+| `<` | 回應欄位來源 | `<todoId` |
+
+### 擷取變數配對
+
+`>` 和 `<` 必須在同一欄位中配對使用：
+
+```gherkin
+| >todo1.id | >todo1.title | title  |
+| <todoId   | <title       | 買牛奶 |
+```
+
+執行後：
+- `todo1.id` = 回應中的 `todoId` 值
+- `todo1.title` = 回應中的 `title` 值
+
+## 自動參數分類
+
+當 Body 欄位名稱與 OpenAPI Spec 中的 Path/Query/Header 參數同名時，ApiCall 會自動帶入，無需額外加前綴：
+
+```gherkin
+# todoId 同時是 Body 和 Path 參數 → 自動帶入 P:todoId
+| todoId | title  |
+| 123    | 買豆漿 |
+```
+
+## 巢狀 JSON 建構
+
+支援 dot notation 和陣列索引，自動建構深層 JSON：
+
+```gherkin
+| name   | config.theme | tags[0] | tags[1] |
+| 我的專案 | dark        | work    | urgent  |
+```
+
+產生：
+
+```json
+{
+  "name": "我的專案",
+  "config": { "theme": "dark" },
+  "tags": ["work", "urgent"]
+}
+```
+
+## 呼叫者身份
+
+`(UID="...")` 指定呼叫者身份，框架會自動注入對應的 Bearer Token：
+
+```gherkin
+# 使用變數作為呼叫者
+When (UID="$Alice.id") 查詢待辦事項, call table:
+  | Q:status |
+  | active   |
+
+# 無需身份驗證
+When (No Actor) 健康檢查, call table:
+  | |
+```
+
+## 時間格式
+
+ApiCall 中的時間值會根據 `isa.yml` 設定的 `time_format` 自動轉換：
+
+| 格式 | 輸出範例 |
+|------|----------|
+| `ISO`（預設） | `"2025-12-25T14:30:00+08:00"` |
+| `TIMESTAMP` | `1766735400000` |
+| `EPOCH` | `1766735400` |
+| `DATE_ONLY` | `"2025-12-25"` |
+| `TIME_ONLY` | `"14:30:00"` |
+
+## 錯誤處理
+
+### Lint 階段
+
+| 錯誤 | 說明 |
+|------|------|
+| 欄位不存在 | DataTable 中的欄位名稱在 OpenAPI Spec 找不到定義 |
+| 缺少必填欄位 | OpenAPI 標記為 required 的參數未提供 |
+| 擷取欄位不存在 | `<` 指定的回應欄位在 Response Schema 中找不到 |
+
+### 執行階段
+
+| 錯誤 | 說明 |
+|------|------|
+| API not found | summary 在 OpenAPI Spec 中找不到對應操作 |
+| 重複的 summary | 多個操作使用相同 summary，無法唯一識別 |
+
+## 完整範例
+
+```gherkin
+Feature: 待辦事項管理
+
+  Background:
+    Given 現在時間為 "2026-01-27T10:00:00"
+    Given 準備一個使用者, with table:
+      | >Alice.id | name  | email             | status |
+      | <userId   | Alice | alice@example.com | ACTIVE |
+
+  Example: 新增並更新待辦事項
+    # 登入取得 Token
+    When (No Actor) 使用者登入, call table:
+      | >AliceToken | email             | password    |
+      | <token      | alice@example.com | password123 |
+
+    # 新增待辦事項
+    When (UID="$Alice.id") 新增待辦事項, call table:
+      | >todo1.id | title  |
+      | <todoId   | 買牛奶 |
+
+    # 更新待辦事項（使用 Path 參數）
+    When (UID="$Alice.id") 更新待辦事項, call table:
+      | P:todoId  | title  |
+      | $todo1.id | 買豆漿 |
+
+    Then 更新待辦事項(200)回應, with table:
+      | todoId    | title  | updatedAt                        |
+      | $todo1.id | 買豆漿 | &sameTime("2026-01-27T10:00:00") |
+```
