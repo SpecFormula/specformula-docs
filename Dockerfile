@@ -3,7 +3,9 @@ FROM node:20-alpine AS deps
 RUN corepack enable && corepack prepare pnpm@latest --activate
 WORKDIR /app
 COPY package.json pnpm-lock.yaml ./
-RUN pnpm install --frozen-lockfile
+# --ignore-scripts skips fumadocs-mdx postinstall (which tries to import vite);
+# the Next.js createMDX() plugin resolves fumadocs-mdx:collections/server at build time.
+RUN pnpm install --frozen-lockfile --ignore-scripts
 
 # Stage 2: Build
 FROM node:20-alpine AS builder
