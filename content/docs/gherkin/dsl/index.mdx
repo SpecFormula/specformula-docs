@@ -1,0 +1,172 @@
+---
+title: Gherkin DSL
+description: Gherkin 語法入門
+---
+
+Gherkin 是一種用於描述軟體行為的領域特定語言 (DSL)，它讓非技術人員也能理解測試規格。SpecFormula 採用 Gherkin 作為規格語言的基礎。
+
+> 本文內容參考自 [Cucumber Gherkin Reference](https://cucumber.io/docs/gherkin/reference/)，感謝 Cucumber 團隊的開源貢獻。
+
+## 基本結構
+
+一個 Gherkin 檔案 (`.feature`) 包含一個 **Feature**，其中定義多個 **Scenario**：
+
+```gherkin
+Feature: 購物車結帳
+
+  Scenario: 空購物車無法結帳
+    Given 購物車是空的
+    When 使用者點擊結帳
+    Then 顯示錯誤訊息 "購物車內沒有商品"
+```
+
+## 核心關鍵字
+
+### Feature
+
+每個 `.feature` 檔案只能有一個 `Feature`，用於描述被測試的功能：
+
+```gherkin
+Feature: 會員登入
+  作為網站會員
+  我希望能夠登入帳號
+  以便存取個人資料
+```
+
+### Scenario / Example
+
+`Scenario`（或 `Example`）描述一個具體的測試案例：
+
+```gherkin
+Scenario: 正確帳密登入成功
+  Given 存在一個帳號 "alice@test.com"
+  When 使用 "alice@test.com" 和正確密碼登入
+  Then 登入成功
+```
+
+### Given / When / Then
+
+這三個關鍵字構成測試的核心結構：
+
+| 關鍵字 | 用途 | 說明 |
+|--------|------|------|
+| `Given` | 前置條件 | 建立測試的初始狀態 |
+| `When` | 動作 | 描述使用者或系統的操作 |
+| `Then` | 預期結果 | 驗證操作後的結果 |
+
+### And / But
+
+當有多個連續的 `Given`、`When` 或 `Then` 時，使用 `And` 或 `But` 提升可讀性：
+
+```gherkin
+Scenario: 登入失敗後鎖定帳號
+  Given 存在一個帳號 "alice@test.com"
+  And 該帳號已連續輸入錯誤密碼 4 次
+  When 使用錯誤密碼登入
+  Then 登入失敗
+  And 帳號被鎖定 30 分鐘
+```
+
+## 進階結構
+
+### Background
+
+`Background` 定義每個 Scenario 執行前的共用前置步驟：
+
+```gherkin
+Feature: 訂單管理
+
+  Background:
+    Given 系統時間為 "2026-01-15T09:00:00"
+    And 存在一個管理員帳號
+
+  Scenario: 查詢今日訂單
+    When 管理員查詢今日訂單
+    Then 回傳今日訂單列表
+
+  Scenario: 匯出訂單報表
+    When 管理員匯出訂單報表
+    Then 下載 CSV 檔案
+```
+
+### Rule
+
+`Rule` 將相關的 Scenario 分組，用於描述特定的業務規則：
+
+```gherkin
+Feature: 折扣計算
+
+  Rule: 滿千折百
+    Example: 消費 1000 元折 100 元
+      Given 購物車金額為 1000 元
+      When 計算折扣
+      Then 折扣金額為 100 元
+
+    Example: 消費 999 元不折扣
+      Given 購物車金額為 999 元
+      When 計算折扣
+      Then 折扣金額為 0 元
+```
+
+### Scenario Outline + Examples
+
+使用 `Scenario Outline` 搭配 `Examples` 表格，以不同資料執行相同情境：
+
+```gherkin
+Scenario Outline: 密碼強度驗證
+  When 輸入密碼 "<password>"
+  Then 強度等級為 "<level>"
+
+  Examples:
+    | password     | level  |
+    | 123          | 弱     |
+    | abc123       | 中     |
+    | Abc123!@#    | 強     |
+```
+
+### Tags
+
+使用 `@` 標記來分類或過濾測試：
+
+```gherkin
+@smoke @login
+Feature: 會員登入
+
+  @happy-path
+  Scenario: 正確帳密登入成功
+    ...
+
+  @error-handling
+  Scenario: 錯誤密碼登入失敗
+    ...
+```
+
+## Data Table
+
+傳遞結構化資料給步驟：
+
+```gherkin
+Given 準備以下商品:
+  | name   | price | stock |
+  | 蘋果   | 30    | 100   |
+  | 香蕉   | 20    | 50    |
+```
+
+## Doc String
+
+傳遞多行文字內容：
+
+```gherkin
+Given 系統回傳以下 JSON:
+  """json
+  {
+    "status": "success",
+    "message": "操作完成"
+  }
+  """
+```
+
+## 延伸閱讀
+
+- [Cucumber 官方文件](https://cucumber.io/docs/gherkin/)
+- [SpecFormula ISA 指令](/docs/gherkin/isa/instructions)

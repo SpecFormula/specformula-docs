@@ -1,4 +1,4 @@
 {
-  "title": "ISA 規格",
-  "pages": ["index", "---ISA---", "isa"]
+  "title": "SpecFormula ISA",
+  "pages": ["index", "---規格指南---", "gherkin"]
 }

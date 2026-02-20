@@ -5,6 +5,94 @@ description: 以宣告式語法準備測試資料
 
 EntitySetup 讓你直接在 Gherkin 中宣告測試的前置資料，無需在 Step Definition 中撰寫 INSERT 語句。
 
+## 與 Entity Mapping 的對應關係
+
+EntitySetup 指令透過 **entity_to_table_mapping.yml** 將業務實體名稱對應到實際的資料表。
+
+### 對應機制
+
+```yaml
+# entity_to_table_mapping.yml
+entity_to_table_mapping:
+  - 使用者: users
+  - 待辦事項: todos
+  - 訂單: orders
+  - 商品: products
+```
+
+```gherkin
+# Gherkin 使用業務語言
+Given 準備一個使用者, with table:
+  | name  | email             |
+  | Alice | alice@example.com |
+
+# SpecFormula 自動對應到 users 資料表
+# INSERT INTO users (name, email) VALUES ('Alice', 'alice@example.com')
+```
+
+### 對應表
+
+| Gherkin 元素 | 對應來源 |
+|-------------|----------|
+| `使用者` | `entity_to_table_mapping` 的 key |
+| `users` 資料表 | `entity_to_table_mapping` 的 value |
+| `name`, `email` 欄位 | 資料表 Schema 定義 |
+
+### 命名規則
+
+**Entity 名稱**：使用業務團隊熟悉的中文或英文名稱
+
+```yaml
+# ✅ 推薦：業務語言
+entity_to_table_mapping:
+  - 會員: members
+  - 訂單: orders
+  - 商品: products
+
+# ❌ 避免：技術名稱
+entity_to_table_mapping:
+  - member_entity: members
+  - tbl_order: orders
+```
+
+**欄位名稱轉換**：DataTable 使用 camelCase，自動對應資料庫的 snake_case
+
+```
+Gherkin: userId      → DB: user_id
+Gherkin: orderDate   → DB: order_date
+Gherkin: createdAt   → DB: created_at
+Gherkin: isActive    → DB: is_active
+```
+
+### Schema 驗證
+
+SpecFormula 會讀取資料庫 Schema 來驗證 DataTable 中的欄位是否存在：
+
+```sql
+-- src/test/resources/specs/data/schema.sql
+CREATE TABLE users (
+    user_id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(100) NOT NULL,
+    email VARCHAR(255) NOT NULL UNIQUE,
+    status VARCHAR(20) DEFAULT 'ACTIVE',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+```
+
+```gherkin
+# ✅ 正確：欄位存在於 Schema
+Given 準備一個使用者, with table:
+  | name  | email             | status |
+  | Alice | alice@example.com | ACTIVE |
+
+# ❌ Lint 錯誤：欄位不存在
+Given 準備一個使用者, with table:
+  | name  | emailAddress      |    # emailAddress 不存在，應為 email
+  | Alice | alice@example.com |
+```
+
+---
+
 ## 基本用法
 
 ```gherkin

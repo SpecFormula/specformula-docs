@@ -5,6 +5,94 @@ description: 以宣告式語法執行 HTTP API 請求
 
 ApiCall 讓你直接在 Gherkin 中宣告 API 呼叫的參數與回應擷取，無需撰寫 HTTP 請求的程式碼。
 
+## 與 OpenAPI Spec 的對應關係
+
+ApiCall 指令透過 **summary** 欄位識別要呼叫的 API。這個設計讓測試檔案使用業務語言，而非技術性的 URL 路徑。
+
+### 對應機制
+
+```yaml
+# api-spec.yml (OpenAPI 3.0)
+paths:
+  /todos:
+    post:
+      summary: 新增待辦事項    # ← ApiCall 透過這個 summary 識別
+      operationId: createTodo
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - title
+              properties:
+                title:
+                  type: string
+                priority:
+                  type: integer
+      responses:
+        "201":
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  todoId:
+                    type: integer
+                  title:
+                    type: string
+```
+
+```gherkin
+# 對應的 Gherkin 語法
+When (UID="$Alice.id") 新增待辦事項, call table:
+  | title  | priority |
+  | 買牛奶 | 1        |
+```
+
+### 對應表
+
+| Gherkin 元素 | OpenAPI Spec 來源 |
+|-------------|-------------------|
+| `新增待辦事項` | `paths.*.*.summary` |
+| HTTP Method | 從 path 定義推斷（`post`, `get`, `put`, `delete`） |
+| URL Path | `paths` 的 key（如 `/todos`） |
+| Request Body 欄位 | `requestBody.content.*.schema.properties` |
+| Path 參數 | `parameters[].in: path` |
+| Query 參數 | `parameters[].in: query` |
+| Response 欄位 | `responses.*.content.*.schema.properties` |
+
+### summary 唯一性要求
+
+每個 API 操作的 `summary` 在整份 OpenAPI Spec 中必須唯一：
+
+```yaml
+# ✅ 正確：summary 各不相同
+/todos:
+  post:
+    summary: 新增待辦事項
+  get:
+    summary: 查詢待辦事項列表
+
+/todos/{id}:
+  get:
+    summary: 查詢單一待辦事項
+  put:
+    summary: 更新待辦事項
+  delete:
+    summary: 刪除待辦事項
+
+# ❌ 錯誤：重複的 summary 會導致無法識別
+/todos:
+  get:
+    summary: 查詢待辦事項
+/todos/{id}:
+  get:
+    summary: 查詢待辦事項    # 重複！
+```
+
+---
+
 ## 基本用法
 
 ```gherkin
