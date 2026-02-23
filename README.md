@@ -43,3 +43,6 @@ resources:
   features and API.
 - [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
 - [Fumadocs](https://fumadocs.dev) - learn about Fumadocs
+
+---
+<!-- CI/CD test: 2026-02-23 -->
