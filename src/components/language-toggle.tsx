@@ -21,7 +21,7 @@ export function LanguageToggle() {
     const segments = pathname.split('/').filter(Boolean);
 
     // Replace the language segment
-    if (i18n.languages.includes(segments[0])) {
+    if ((i18n.languages as readonly string[]).includes(segments[0])) {
       segments[0] = newLang;
     } else {
       segments.unshift(newLang);
