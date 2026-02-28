@@ -1,6 +1,6 @@
 ---
 title: 規格三巨頭
-description: API Spec、Entity Mapping、ISA Config 的協同運作
+description: Feature、API Spec、Entity Spec 的協同運作
 ---
 
 SpecFormula 的後端測試框架建立在三份核心規格文件之上，我們稱之為「規格三巨頭」。這三份規格相互依賴、共同演進，構成了宣告式 BDD 測試的基礎。
@@ -9,9 +9,9 @@ SpecFormula 的後端測試框架建立在三份核心規格文件之上，我�
 
 | 規格 | 檔案 | 用途 |
 |------|------|------|
-| **API Spec** | `api-spec.yml` | 定義 API 端點、請求/回應結構（OpenAPI 3.0） |
-| **Entity Mapping** | `entity_to_table_mapping.yml` | 定義業務實體與資料表的對應關係 |
-| **ISA Config** | `isa.yml` | 定義指令語法與測試環境配置 |
+| **Feature File** | `*.feature` | 定義測試場景，引用 API Spec 與 Entity Spec |
+| **API Spec** | `*.yml`（OpenAPI 3.0 格式） | 定義 API 端點、請求/回應結構 |
+| **Entity Spec** | `entity_to_table_mapping.yml` + `*.sql` | 定義實體名稱與資料表的關聯，以及資料表結構（DDL） |
 
 ```mermaid
 flowchart TB
@@ -21,26 +21,28 @@ flowchart TB
         F3["Then 應該存在一個打卡記錄, with table: ..."]
     end
 
-    subgraph Specs["規格三巨頭"]
-        subgraph EM["Entity Mapping"]
-            EM1["特務 → agents"]
-            EM2["打卡記錄 → punch_records"]
-        end
+    subgraph Specs[" "]
         subgraph API["API Spec"]
             API1["summary: 打卡"]
             API2["POST /punch"]
             API3["request/response"]
         end
-        subgraph ISA["ISA Config"]
-            ISA1["指令格式定義"]
-            ISA2["資料來源配置"]
-            ISA3["時間格式設定"]
+        subgraph EM["Entity Spec"]
+            EM1["特務 → agents"]
+            EM2["打卡記錄 → punch_records"]
+            DDL["DDL → agents punch_records 資料表結構"]
         end
     end
 
+    subgraph ISA["ISA Config（配置檔）"]
+        ISA1["指令語法定義"]
+        ISA2["API 配置"]
+        ISA3["資料來源配置"]
+    end
+
     subgraph Engine["SpecFormula 引擎"]
-        E1["解析指令語法 → 識別操作類型"]
-        E2["查詢 Entity Mapping → 定位資料表"]
+        E1["解析指令語法 → 識別指令類型"]
+        E2["查詢 Entity Spec → 取得資料表結構"]
         E3["查詢 API Spec → 建構 HTTP 請求"]
         E4["執行操作並驗證結果"]
     end
@@ -63,13 +65,28 @@ flowchart TB
 # 傳統做法的問題
 API 文件說：POST /users 需要 email 欄位
 資料庫有：users.email_address 欄位
-測試程式：request.put("mail", value)  ← 三方不一致
+測試程式：request.put("mail", value)  ← 三方各自維護，容易不一致
 ```
 
-SpecFormula 透過三巨頭建立單一事實來源：
+SpecFormula 透過三巨頭建立單一事實來源，規格定義與測試直接對應：
+
+**Entity Spec** — 定義實體與資料表的關聯及結構
 
 ```yaml
-# api-spec.yml 定義 API 結構
+# entity_to_table_mapping.yml
+entity_to_table_mapping:
+  - 使用者: users
+```
+
+```sql
+-- DDL (schema.sql)
+CREATE TABLE users (user_id INT PRIMARY KEY, email VARCHAR(255) NOT NULL);
+```
+
+**API Spec** — 定義 API 結構
+
+```yaml
+# api-spec.yml
 paths:
   /users:
     post:
@@ -78,30 +95,39 @@ paths:
         properties:
           email:
             type: string
+```
 
-# entity_to_table_mapping.yml 定義實體對應
-entity_to_table_mapping:
-  - 使用者: users
+**測試直接引用規格，無需重複定義**
 
-# 測試直接引用，無需重複定義
-Given 準備一個使用者, with table:
+```gherkin
+When (No Actor) 建立使用者, call table:       # ← 對應 API Spec（summary: 建立使用者）
+  | email             |
+  | alice@example.com |
+
+Then 應該存在一個使用者, with table:           # ← 對應 Entity Spec（使用者 → users）
   | email             |
   | alice@example.com |
 ```
 
 ### 2. 連動變更 (Cascading Changes)
 
-當 API 變更時，測試應該自動感知並提示需要更新：
+當規格變更時，Lint 會自動檢查 Feature、API Spec、Entity Spec 三者的一致性，在 CI 階段就能發現問題：
+
+**API Schema 變更**
 
 ```
-API 變更：將 /users 改為 /members
+API Spec 新增必填欄位：requestBody.properties 加入 department (required)
             ↓
-Entity Mapping 可能需要更新：使用者 → members
-            ↓
-測試檔案中的「建立使用者」summary 需確認是否對應正確
+Lint 檢查 .feature：所有「建立使用者」的 call table 是否包含 department 欄位
 ```
 
-SpecFormula 的 Lint 功能會在變更時檢查三巨頭的一致性，在 CI 階段就能發現問題。
+**Table Schema 變更**
+
+```
+DDL 欄位異動：users 資料表將 email 改為 email_address
+            ↓
+Lint 檢查 .feature：所有「使用者」的 with table 是否使用正確的欄位名稱
+```
 
 ### 3. 規格驅動開發 (Spec-Driven Development)
 
@@ -110,7 +136,7 @@ SpecFormula 的 Lint 功能會在變更時檢查三巨頭的一致性，在 CI �
 ```
 Phase 1: 產品經理定義 API Spec
          ↓
-Phase 2: DBA 設計資料表，建立 Entity Mapping
+Phase 2: DBA 設計資料表，建立 Entity Spec
          ↓
 Phase 3: QA 撰寫 .feature 測試（此時測試會失敗）
          ↓
@@ -125,8 +151,13 @@ Phase 4: 開發者實作功能，讓測試通過
 
 ### 檔案位置
 
+API Spec 可拆分為多個 `.yml` 檔案，只要符合 OpenAPI 3.0 格式即可。路徑由 `isa.yml` 的 `config.api.resource_path` 指定。
+
 ```
-src/test/resources/specs/api/api-spec.yml
+src/test/resources/specs/api/
+├── api-spec.yml          # 可拆分為多個檔案
+├── auth-api.yml          # 例如依模組拆分
+└── ...
 ```
 
 ### 核心結構
@@ -140,7 +171,7 @@ info:
 paths:
   /punch:
     post:
-      summary: 打卡          # ← 這是 ApiCall 指令的識別依據
+      summary: 打卡          # ← ApiCall 與 ResponseValidate 指令的識別依據
       operationId: punch
       requestBody:
         required: true
@@ -180,7 +211,9 @@ paths:
                     type: number
 ```
 
-### 與 ApiCall 指令的對應
+### 與 Feature 指令的對應
+
+**ApiCall** — 透過 `summary` 識別 API 端點，發送 HTTP 請求：
 
 ```gherkin
 When (UID="$Agent.id") 打卡, call table:
@@ -188,37 +221,75 @@ When (UID="$Agent.id") 打卡, call table:
   | $Agent.id    | IN        | @time("2026-01-27T09:00:00") |
 ```
 
+**ResponseValidate** — 透過 `summary` 與 status code 驗證回應內容：
+
+```gherkin
+Then 打卡(200)回應, with table:
+  | recordId | agentId | punchType |
+  | @notnull | 1       | IN        |
+```
+
 | Gherkin 元素 | 對應 API Spec |
 |-------------|---------------|
 | `打卡` | `paths./punch.post.summary` |
 | `agentId`, `punchType`, `punchTime` | `requestBody.properties` |
-| HTTP Method | `paths./punch.post` (從 path 定義推斷) |
+| `recordId`, `punchType` 等回應欄位 | `responses.200.schema.properties` |
+| HTTP Method | `paths./punch.post`（從 path 定義推斷） |
 
 ### 重要規則
 
 1. **summary 必須唯一**：每個操作的 `summary` 在整份 API Spec 中必須唯一，否則 SpecFormula 無法識別
-2. **Schema 定義完整**：Request/Response 的 Schema 需完整定義，用於 Lint 驗證
-3. **required 標記正確**：必填欄位需標記 `required`，Lint 會檢查測試是否提供
+2. **Schema 定義完整**：Request/Response 的 Schema 需完整定義，用於驗證
+3. **required 標記正確**：必填欄位需標記 `required`，確保測試提供所有必要欄位
 
 ---
 
-## Entity Mapping
+## Entity Spec
 
 ### 檔案位置
 
+每個 Data Source 目錄下包含：
+- **`entity_to_table_mapping.yml`** — 定義實體名稱與資料表的關聯
+- **`*.sql`（DDL）** — 定義資料表結構（可多檔）
+
+路徑由 `isa.yml` 的 `config.data.source[].resource_path` 指定。
+
 ```
-src/test/resources/specs/data/entity_to_table_mapping.yml
+src/test/resources/specs/data/
+└── primary/
+    ├── entity_to_table_mapping.yml   # 實體對應
+    ├── agents.sql                    # DDL（檔名不限，*.sql 皆可，可多檔）
+    └── punch_records.sql
 ```
 
 ### 核心結構
 
+**Entity Mapping** — 定義業務實體名稱與資料表的對應：
+
 ```yaml
+# entity_to_table_mapping.yml
 entity_to_table_mapping:
   - 特務: agents
   - 打卡記錄: punch_records
-  - 請假申請: leave_requests
-  - 假期額度: leave_entitlements
-  - 加班申請: overtime_requests
+```
+
+**DDL** — 定義資料表的 Schema，SpecFormula 用來驗證欄位是否存在：
+
+```sql
+-- agents.sql
+CREATE TABLE agents (
+    agent_id INT PRIMARY KEY,
+    name     VARCHAR(100) NOT NULL,
+    email    VARCHAR(255) NOT NULL
+);
+
+-- punch_records.sql
+CREATE TABLE punch_records (
+    record_id  INT PRIMARY KEY,
+    agent_id   INT NOT NULL,
+    punch_type VARCHAR(10),
+    punch_time DATETIME
+);
 ```
 
 ### 與 EntitySetup/EntityValidate 指令的對應
@@ -248,18 +319,11 @@ Gherkin: punchType  → DB: punch_type
 Gherkin: punchTime  → DB: punch_time
 ```
 
-### 資料表 Schema 來源
-
-SpecFormula 會讀取資料庫的 DDL 或 Schema 定義來驗證欄位是否存在：
-
-```
-src/test/resources/specs/data/schema.sql   # H2
-src/main/resources/db/migration/*.sql      # Flyway
-```
-
 ---
 
-## ISA Config
+## ISA Config（配置檔）
+
+ISA Config 是 SpecFormula 引擎的配置檔，定義指令語法與規格檔案路徑。通常在專案初期設定完成後，不需頻繁變動。
 
 ### 檔案位置
 
@@ -274,30 +338,38 @@ config:
   api:
     resource_path: specs/api              # API Spec 相對路徑
     project_path: src/test/resources/specs/api
-    time_format: timestamp                # 時間格式：ISO, timestamp, epoch
   data:
     source:
-      - name: default
-        resource_path: specs/data         # Entity Mapping 相對路徑
-        project_path: src/test/resources/specs/data
-        db_type: h2                        # 資料庫類型
+      - name: primary
+        resource_path: specs/data/primary
+        project_path: src/test/resources/specs/data/primary
+        db_type: mssql
 
 instructions:
   - name: Time control
-    format: ^現在的時間是 "(?P<time>.+)"$
+    format: ^現在時間為 "(?P<time>[^"]+)"$
     instruction_type: time_control
+
+  - name: Data preparation
+    format: ^準備一個(?P<entity>[\u4e00-\u9fffa-zA-Z0-9_]+), with table:$
+    instruction_type: entity_setup
 
   - name: API call
     format: ^\((?:No Actor|UID="(?P<userId>\$[\w.]+)")\) (?P<summary>.+?), call table:$
     instruction_type: api_call
 
-  - name: Entity setup
-    format: ^準備一個(?P<entity>[\u4e00-\u9fffa-zA-Z0-9_]+), with table:$
-    instruction_type: entity_setup
+  - name: Response validation with API summary and status code
+    format: ^(?P<summary>.+?)\((?P<status_code>\d{3})\)回應,?\s*with table:$
+    instruction_type: response_validate
+    data_format: data_table
 
-  - name: Entity validation
+  - name: Database validation
     format: ^應該存在一個(?P<entity>[\u4e00-\u9fffa-zA-Z0-9_]+), with table:$
     instruction_type: entity_validate
+
+  - name: Database non-existence validation
+    format: ^應該不存在一個(?P<entity>[\u4e00-\u9fffa-zA-Z0-9_]+), with table:$
+    instruction_type: entity_non_existence_validate
 ```
 
 ### 配置說明
@@ -305,8 +377,8 @@ instructions:
 | 配置項 | 說明 |
 |--------|------|
 | `config.api.resource_path` | API Spec 的 classpath 相對路徑 |
-| `config.api.time_format` | API 請求中時間欄位的序列化格式 |
-| `config.data.source[].db_type` | 資料庫類型（h2, postgresql, mysql） |
+| `config.data.source[]` | 可配置多個 Data Source，每個各自指向一組 Entity Spec |
+| `config.data.source[].db_type` | 資料庫類型（h2, mssql, postgresql, mysql） |
 | `instructions[].format` | 指令的正規表達式，用於匹配 Gherkin 步驟 |
 | `instructions[].instruction_type` | 指令類型，決定執行邏輯 |
 
@@ -317,19 +389,18 @@ instructions:
 ### 新增 API 端點
 
 ```
-1. 在 api-spec.yml 新增 path 定義
-2. 若涉及新實體，在 entity_to_table_mapping.yml 新增對應
-3. 撰寫 .feature 測試
-4. 實作 API
-5. 執行測試驗證
+1. 在 API Spec 新增 path 定義
+2. 撰寫 .feature 測試
+3. 實作 API
+4. 執行測試驗證
 ```
 
 ### 修改資料表結構
 
 ```
-1. 更新資料庫 Migration
-2. 若欄位名稱變更，檢查 .feature 中是否使用舊欄位名
-3. 若實體名稱變更，更新 entity_to_table_mapping.yml
+1. 更新 DDL（*.sql）
+2. 若資料表名稱變更，更新 entity_to_table_mapping.yml 的對應
+3. 若欄位名稱變更，更新 .feature 中的欄位名稱
 4. 執行 Lint 檢查一致性
 5. 執行測試驗證
 ```
@@ -380,10 +451,20 @@ entity_to_table_mapping:
 
 ```bash
 # 在 CI 中加入 Lint 步驟
-mvn test -Dtest="SpecFormulaLintTest"
+# TODO: 指令待補充
 ```
 
 Lint 會檢查：
 - API Spec 中的 summary 是否唯一
-- Entity Mapping 中的資料表是否存在
-- .feature 中使用的欄位是否在 Schema 中定義
+- Entity Spec 中的資料表是否存在於 DDL
+- .feature 中使用的欄位是否在 Entity Spec 與 API Spec 中定義
+
+### 4. CI 自動化測試
+
+將測試整合至 CI pipeline，確保每次提交都自動驗證三巨頭的一致性。
+
+**Java (Maven)**
+
+```bash
+mvn test
+```

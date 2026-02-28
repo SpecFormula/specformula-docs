@@ -1,46 +1,48 @@
 ---
 title: The Three Specs
-description: How API Spec, Entity Mapping, and ISA Config Work Together
+description: How Feature, API Spec, and Entity Spec Work Together
 ---
 
-SpecFormula's backend testing framework is built on three core specification files, which we call "The Three Specs." These three specifications are interdependent and evolve together, forming the foundation of declarative BDD testing.
+SpecFormula's backend testing framework is built on three core specifications, which we call "The Three Specs": **Feature** (`.feature` test files), **API Spec** (OpenAPI specifications), and **Entity Spec** (entity and table specifications). These three are interdependent and evolve together, forming the foundation of declarative BDD testing.
 
 ## Overview
 
 | Spec | File | Purpose |
 |------|------|---------|
-| **API Spec** | `api-spec.yml` | Defines API endpoints, request/response structures (OpenAPI 3.0) |
-| **Entity Mapping** | `entity_to_table_mapping.yml` | Defines the mapping between business entities and database tables |
-| **ISA Config** | `isa.yml` | Defines instruction syntax and test environment configuration |
+| **Feature File** | `*.feature` | Defines test scenarios, references API Spec and Entity Spec |
+| **API Spec** | `*.yml` (OpenAPI 3.0 format) | Defines API endpoints, request/response structures |
+| **Entity Spec** | `entity_to_table_mapping.yml` + `*.sql` | Defines entity-to-table mapping and table structure (DDL) |
 
 ```mermaid
 flowchart TB
-    subgraph Feature[".feature Test File"]
+    subgraph Feature[".feature Test Files"]
         F1["Given prepare an agent, with table: ..."]
         F2["When (UID=$Agent.id) punch, call table: ..."]
         F3["Then should exist a punch record, with table: ..."]
     end
 
-    subgraph Specs["The Three Specs"]
-        subgraph EM["Entity Mapping"]
-            EM1["agent → agents"]
-            EM2["punch record → punch_records"]
-        end
+    subgraph Specs[" "]
         subgraph API["API Spec"]
             API1["summary: punch"]
             API2["POST /punch"]
             API3["request/response"]
         end
-        subgraph ISA["ISA Config"]
-            ISA1["Instruction format definition"]
-            ISA2["Data source configuration"]
-            ISA3["Time format settings"]
+        subgraph EM["Entity Spec"]
+            EM1["agent → agents"]
+            EM2["punch record → punch_records"]
+            DDL["DDL → agents punch_records table structure"]
         end
     end
 
+    subgraph ISA["ISA Config (Configuration)"]
+        ISA1["Instruction syntax definition"]
+        ISA2["API configuration"]
+        ISA3["Data source configuration"]
+    end
+
     subgraph Engine["SpecFormula Engine"]
-        E1["Parse instruction syntax → Identify operation type"]
-        E2["Query Entity Mapping → Locate database table"]
+        E1["Parse instruction syntax → Identify instruction type"]
+        E2["Query Entity Spec → Get table structure"]
         E3["Query API Spec → Build HTTP request"]
         E4["Execute operation and verify result"]
     end
@@ -66,10 +68,25 @@ Database has: users.email_address column
 Test code: request.put("mail", value)  ← Inconsistent across all three
 ```
 
-SpecFormula establishes a single source of truth through The Three Specs:
+SpecFormula establishes a single source of truth through The Three Specs, with direct mapping between spec definitions and tests:
+
+**Entity Spec** — Defines entity-to-table mapping and table structure
 
 ```yaml
-# api-spec.yml defines API structure
+# entity_to_table_mapping.yml
+entity_to_table_mapping:
+  - user: users
+```
+
+```sql
+-- DDL (schema.sql)
+CREATE TABLE users (user_id INT PRIMARY KEY, email VARCHAR(255) NOT NULL);
+```
+
+**API Spec** — Defines API structure
+
+```yaml
+# api-spec.yml
 paths:
   /users:
     post:
@@ -78,30 +95,39 @@ paths:
         properties:
           email:
             type: string
+```
 
-# entity_to_table_mapping.yml defines entity mapping
-entity_to_table_mapping:
-  - user: users
+**Tests directly reference specs, no need to redefine**
 
-# Tests reference directly, no need to redefine
-Given prepare a user, with table:
+```gherkin
+When (No Actor) create user, call table:       # ← Maps to API Spec (summary: create user)
+  | email             |
+  | alice@example.com |
+
+Then should exist a user, with table:           # ← Maps to Entity Spec (user → users)
   | email             |
   | alice@example.com |
 ```
 
 ### 2. Cascading Changes
 
-When an API changes, tests should automatically detect and prompt for updates:
+When specs change, Lint automatically checks the consistency of Feature, API Spec, and Entity Spec, catching issues during the CI phase:
+
+**API Schema Change**
 
 ```
-API change: Rename /users to /members
+API Spec adds required field: requestBody.properties adds department (required)
             ↓
-Entity Mapping may need update: user → members
-            ↓
-Verify if "create user" summary in test files maps correctly
+Lint checks .feature: whether all "create user" call tables include the department field
 ```
 
-SpecFormula's Lint feature checks the consistency of The Three Specs on changes, catching issues during the CI phase.
+**Table Schema Change**
+
+```
+DDL column change: users table renames email to email_address
+            ↓
+Lint checks .feature: whether all "user" with tables use the correct column name
+```
 
 ### 3. Spec-Driven Development
 
@@ -110,7 +136,7 @@ The Three Specs support a "spec first, implementation later" development workflo
 ```
 Phase 1: Product Manager defines API Spec
          ↓
-Phase 2: DBA designs database tables, creates Entity Mapping
+Phase 2: DBA designs database tables, creates Entity Spec
          ↓
 Phase 3: QA writes .feature tests (tests will fail at this point)
          ↓
@@ -125,8 +151,13 @@ This workflow ensures spec, implementation, and tests are aligned from the start
 
 ### File Location
 
+API Spec can be split into multiple `.yml` files, as long as they follow OpenAPI 3.0 format. Path is specified by `config.api.resource_path` in `isa.yml`.
+
 ```
-src/test/resources/specs/api/api-spec.yml
+src/test/resources/specs/api/
+├── api-spec.yml          # Can be split into multiple files
+├── auth-api.yml          # e.g., split by module
+└── ...
 ```
 
 ### Core Structure
@@ -140,7 +171,7 @@ info:
 paths:
   /punch:
     post:
-      summary: punch          # ← This is what ApiCall instruction uses to identify
+      summary: punch          # ← Identifier for ApiCall and ResponseValidate instructions
       operationId: punch
       requestBody:
         required: true
@@ -180,7 +211,9 @@ paths:
                     type: number
 ```
 
-### Mapping with ApiCall Instruction
+### Mapping with Feature Instructions
+
+**ApiCall** — Identifies API endpoint via `summary`, sends HTTP request:
 
 ```gherkin
 When (UID="$Agent.id") punch, call table:
@@ -188,37 +221,75 @@ When (UID="$Agent.id") punch, call table:
   | $Agent.id    | IN        | @time("2026-01-27T09:00:00") |
 ```
 
+**ResponseValidate** — Validates response content via `summary` and status code:
+
+```gherkin
+Then punch(200) response, with table:
+  | recordId | agentId | punchType |
+  | @notnull | 1       | IN        |
+```
+
 | Gherkin Element | API Spec Mapping |
 |-----------------|------------------|
 | `punch` | `paths./punch.post.summary` |
 | `agentId`, `punchType`, `punchTime` | `requestBody.properties` |
+| `recordId`, `punchType` etc. response fields | `responses.200.schema.properties` |
 | HTTP Method | `paths./punch.post` (inferred from path definition) |
 
 ### Important Rules
 
 1. **summary must be unique**: Each operation's `summary` must be unique across the entire API Spec, otherwise SpecFormula cannot identify it
-2. **Complete schema definition**: Request/Response schemas must be fully defined for Lint validation
-3. **Correct required marking**: Required fields must be marked with `required`, Lint will check if tests provide them
+2. **Complete schema definition**: Request/Response schemas must be fully defined for validation
+3. **Correct required marking**: Required fields must be marked with `required`, ensuring tests provide all necessary fields
 
 ---
 
-## Entity Mapping
+## Entity Spec
 
 ### File Location
 
+Each Data Source directory contains:
+- **`entity_to_table_mapping.yml`** — Defines entity name to table mapping
+- **`*.sql` (DDL)** — Defines table structure (multiple files supported)
+
+Path is specified by `config.data.source[].resource_path` in `isa.yml`.
+
 ```
-src/test/resources/specs/data/entity_to_table_mapping.yml
+src/test/resources/specs/data/
+└── primary/
+    ├── entity_to_table_mapping.yml   # Entity mapping
+    ├── agents.sql                    # DDL (any filename, *.sql, multiple files supported)
+    └── punch_records.sql
 ```
 
 ### Core Structure
 
+**Entity Mapping** — Defines the mapping between business entity names and tables:
+
 ```yaml
+# entity_to_table_mapping.yml
 entity_to_table_mapping:
   - agent: agents
   - punch record: punch_records
-  - leave request: leave_requests
-  - leave entitlement: leave_entitlements
-  - overtime request: overtime_requests
+```
+
+**DDL** — Defines table schema, used by SpecFormula to validate column existence:
+
+```sql
+-- agents.sql
+CREATE TABLE agents (
+    agent_id INT PRIMARY KEY,
+    name     VARCHAR(100) NOT NULL,
+    email    VARCHAR(255) NOT NULL
+);
+
+-- punch_records.sql
+CREATE TABLE punch_records (
+    record_id  INT PRIMARY KEY,
+    agent_id   INT NOT NULL,
+    punch_type VARCHAR(10),
+    punch_time DATETIME
+);
 ```
 
 ### Mapping with EntitySetup/EntityValidate Instructions
@@ -248,18 +319,11 @@ Gherkin: punchType  → DB: punch_type
 Gherkin: punchTime  → DB: punch_time
 ```
 
-### Database Schema Source
-
-SpecFormula reads database DDL or Schema definitions to validate column existence:
-
-```
-src/test/resources/specs/data/schema.sql   # H2
-src/main/resources/db/migration/*.sql      # Flyway
-```
-
 ---
 
-## ISA Config
+## ISA Config (Configuration)
+
+ISA Config is the configuration file for the SpecFormula engine, defining instruction syntax and spec file paths. It is typically set up once at the beginning of a project and rarely needs to change.
 
 ### File Location
 
@@ -274,30 +338,38 @@ config:
   api:
     resource_path: specs/api              # API Spec relative path
     project_path: src/test/resources/specs/api
-    time_format: timestamp                # Time format: ISO, timestamp, epoch
   data:
     source:
-      - name: default
-        resource_path: specs/data         # Entity Mapping relative path
-        project_path: src/test/resources/specs/data
-        db_type: h2                        # Database type
+      - name: primary
+        resource_path: specs/data/primary
+        project_path: src/test/resources/specs/data/primary
+        db_type: mssql
 
 instructions:
   - name: Time control
-    format: ^current time is "(?P<time>.+)"$
+    format: ^current time is "(?P<time>[^"]+)"$
     instruction_type: time_control
+
+  - name: Data preparation
+    format: ^prepare a (?P<entity>[\w\s]+), with table:$
+    instruction_type: entity_setup
 
   - name: API call
     format: ^\((?:No Actor|UID="(?P<userId>\$[\w.]+)")\) (?P<summary>.+?), call table:$
     instruction_type: api_call
 
-  - name: Entity setup
-    format: ^prepare a (?P<entity>[\w\s]+), with table:$
-    instruction_type: entity_setup
+  - name: Response validation with API summary and status code
+    format: ^(?P<summary>.+?)\((?P<status_code>\d{3})\) response,?\s*with table:$
+    instruction_type: response_validate
+    data_format: data_table
 
-  - name: Entity validation
+  - name: Database validation
     format: ^should exist a (?P<entity>[\w\s]+), with table:$
     instruction_type: entity_validate
+
+  - name: Database non-existence validation
+    format: ^should not exist a (?P<entity>[\w\s]+), with table:$
+    instruction_type: entity_non_existence_validate
 ```
 
 ### Configuration Details
@@ -305,8 +377,8 @@ instructions:
 | Config Item | Description |
 |-------------|-------------|
 | `config.api.resource_path` | API Spec classpath relative path |
-| `config.api.time_format` | Serialization format for time fields in API requests |
-| `config.data.source[].db_type` | Database type (h2, postgresql, mysql) |
+| `config.data.source[]` | Multiple Data Sources supported, each pointing to a set of Entity Spec |
+| `config.data.source[].db_type` | Database type (h2, mssql, postgresql, mysql) |
 | `instructions[].format` | Regular expression for instruction, used to match Gherkin steps |
 | `instructions[].instruction_type` | Instruction type, determines execution logic |
 
@@ -317,19 +389,18 @@ instructions:
 ### Adding a New API Endpoint
 
 ```
-1. Add path definition in api-spec.yml
-2. If involving new entity, add mapping in entity_to_table_mapping.yml
-3. Write .feature tests
-4. Implement the API
-5. Run tests to verify
+1. Add path definition in API Spec
+2. Write .feature tests
+3. Implement the API
+4. Run tests to verify
 ```
 
-### Modifying Database Structure
+### Modifying Table Structure
 
 ```
-1. Update database Migration
-2. If column name changes, check if .feature uses old column name
-3. If entity name changes, update entity_to_table_mapping.yml
+1. Update DDL (*.sql)
+2. If table name changes, update entity_to_table_mapping.yml mapping
+3. If column name changes, update column names in .feature files
 4. Run Lint to check consistency
 5. Run tests to verify
 ```
@@ -380,10 +451,20 @@ entity_to_table_mapping:
 
 ```bash
 # Add Lint step in CI
-mvn test -Dtest="SpecFormulaLintTest"
+# TODO: Command to be added
 ```
 
 Lint checks:
 - Whether summaries in API Spec are unique
-- Whether tables in Entity Mapping exist
-- Whether fields used in .feature are defined in Schema
+- Whether tables in Entity Spec exist in DDL
+- Whether fields used in .feature are defined in Entity Spec and API Spec
+
+### 4. CI Automated Testing
+
+Integrate tests into CI pipeline to ensure every commit automatically validates The Three Specs consistency.
+
+**Java (Maven)**
+
+```bash
+mvn test
+```
