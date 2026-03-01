@@ -37,9 +37,18 @@ instructions:
     format: ^(?P<summary>.+?)\((?P<status_code>\d{3})\) response,?\s*with table:$
     instruction_type: response_validate
 
+  - name: Response validation (JSON)
+    format: ^(?P<summary>.+?)\((?P<status_code>\d{3})\) response,?\s*with JSON:$
+    instruction_type: response_validate
+    data_format: json
+
   - name: Database validation
     format: ^should exist a (?P<entity>[\w\s]+), with table:$
     instruction_type: entity_validate
+
+  - name: Database non-existence validation
+    format: ^should not exist a (?P<entity>[\w\s]+), with table:$
+    instruction_type: entity_non_existence_validate
 ```
 
 ## API Configuration
@@ -115,6 +124,7 @@ Given prepare a user, with table:
 | `name` | Instruction name (for identification and error messages) |
 | `format` | Regular expression to match Gherkin Steps |
 | `instruction_type` | Corresponding ISA instruction type |
+| `data_format` | Data format: `data_table` (default), `json` |
 
 ### Instruction Type Reference
 
@@ -125,6 +135,8 @@ Given prepare a user, with table:
 | `api_call` | [ApiCall](/docs/gherkin/isa/backend/instructions/api-call) |
 | `response_validate` | [ResponseValidate](/docs/gherkin/isa/backend/instructions/response-validate) |
 | `entity_validate` | [EntityValidate](/docs/gherkin/isa/backend/instructions/entity-validate) |
+| `entity_non_existence_validate` | [EntityValidate](/docs/gherkin/isa/backend/instructions/entity-validate) (non-existence) |
+| `custom` | User-defined Step Definition |
 
 ### Regular Expression Capture Groups
 
@@ -137,3 +149,5 @@ Use `(?P<name>...)` syntax to capture parameters from Steps:
 | `api_call` | `summary`, `userId` (optional) |
 | `response_validate` | `summary`, `status_code` |
 | `entity_validate` | `entity` |
+| `entity_non_existence_validate` | `entity` |
+| `custom` | (depends on user-defined Step Definition) |
