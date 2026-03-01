@@ -5,9 +5,9 @@ description: 以宣告式語法準備測試資料
 
 EntitySetup 讓你直接在 Gherkin 中宣告測試的前置資料，無需在 Step Definition 中撰寫 INSERT 語句。
 
-## 與 Entity Mapping 的對應關係
+## 與 Entity Spec 的對應關係
 
-EntitySetup 指令透過 **entity_to_table_mapping.yml** 將業務實體名稱對應到實際的資料表。
+EntitySetup 指令透過 **Entity Spec** 將業務實體名稱對應到實際的資料表，並根據 DDL 驗證欄位是否存在。
 
 ### 對應機制
 
@@ -20,8 +20,18 @@ entity_to_table_mapping:
   - 商品: products
 ```
 
+```sql
+-- schema.sql
+CREATE TABLE users (
+    user_id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(100) NOT NULL,
+    email VARCHAR(255) NOT NULL UNIQUE,
+    status VARCHAR(20) DEFAULT 'ACTIVE',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+```
+
 ```gherkin
-# Gherkin 使用業務語言
 Given 準備一個使用者, with table:
   | name  | email             |
   | Alice | alice@example.com |
@@ -30,13 +40,11 @@ Given 準備一個使用者, with table:
 # INSERT INTO users (name, email) VALUES ('Alice', 'alice@example.com')
 ```
 
-### 對應表
-
 | Gherkin 元素 | 對應來源 |
 |-------------|----------|
 | `使用者` | `entity_to_table_mapping` 的 key |
 | `users` 資料表 | `entity_to_table_mapping` 的 value |
-| `name`, `email` 欄位 | 資料表 Schema 定義 |
+| `name`, `email` 欄位 | DDL 欄位定義 |
 
 ### 命名規則
 
@@ -58,29 +66,16 @@ entity_to_table_mapping:
 **欄位名稱轉換**：DataTable 使用 camelCase，自動對應資料庫的 snake_case
 
 ```
-Gherkin: userId      → DB: user_id
-Gherkin: orderDate   → DB: order_date
-Gherkin: createdAt   → DB: created_at
-Gherkin: isActive    → DB: is_active
+Gherkin: userId    → DB: user_id
+Gherkin: createdAt → DB: created_at
 ```
 
 ### Schema 驗證
 
-SpecFormula 會讀取資料庫 Schema 來驗證 DataTable 中的欄位是否存在：
-
-```sql
--- src/test/resources/specs/data/schema.sql
-CREATE TABLE users (
-    user_id BIGINT AUTO_INCREMENT PRIMARY KEY,
-    name VARCHAR(100) NOT NULL,
-    email VARCHAR(255) NOT NULL UNIQUE,
-    status VARCHAR(20) DEFAULT 'ACTIVE',
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-```
+SpecFormula 會根據 DDL 驗證 DataTable 中的欄位是否存在：
 
 ```gherkin
-# ✅ 正確：欄位存在於 Schema
+# ✅ 正確：欄位存在於 DDL
 Given 準備一個使用者, with table:
   | name  | email             | status |
   | Alice | alice@example.com | ACTIVE |
@@ -101,10 +96,10 @@ Given 準備一個使用者, with table:
   | <userId   | Alice | alice@example.com | ACTIVE |
 ```
 
-這段語法會：
-1. 在 `users` 資料表插入一筆記錄
-2. 從資料庫反查自動產生的 `userId`
-3. 將 `userId` 存入變數 `Alice.id`
+這段指令會：
+1. 透過 Entity Spec 將「使用者」對應到 `users` 資料表，並取得欄位定義
+2. 新增一筆 `name = Alice`、`email = alice@example.com`、`status = ACTIVE` 的資料寫入資料庫
+3. 從資料庫反查 `user_id` 欄位值，存入變數 `Alice.id`
 
 ## 為什麼不用 API 建立前置資料？
 
@@ -122,41 +117,36 @@ Given 準備一個使用者, with table:
   | Alice | alice@example.com |
 ```
 
-## 欄位名稱轉換
-
-DataTable 使用 camelCase，框架自動對應資料庫的 snake_case：
-
-```
-DataTable: orderDate  → DB: order_date
-DataTable: userId     → DB: user_id
-DataTable: createdAt  → DB: created_at
-```
-
 ## 型別轉換
 
-DataTable 中的值皆為字串，框架根據資料庫欄位定義自動轉型：
+DataTable 中的值皆為字串，框架會根據 DDL 中對應欄位的型別定義（如 `INT`、`DATE`、`DATETIME`）自動將字串轉為正確的資料庫型別：
 
-| 輸入 | 轉換結果 |
-|------|----------|
-| `"123"` | Integer / Long / BigDecimal |
-| `"2026-01-27"` | LocalDate |
-| `"2026-01-27T10:00:00"` | LocalDateTime |
-| `@time(now)` | 當前 Mock 時間 |
-| `@date(now-1d)` | 昨天日期 |
+| DDL 欄位型別 | DataTable 輸入 | 轉換結果 |
+|-------------|---------------|----------|
+| `INT` / `BIGINT` | `"123"` | Integer / Long |
+| `DECIMAL` | `"99.99"` | BigDecimal |
+| `DATE` | `"2026-01-27"` | LocalDate |
+| `DATETIME` / `TIMESTAMP` | `"2026-01-27T10:00:00"` | LocalDateTime |
+| `DATETIME` / `TIMESTAMP` | `@time(now)` | 當前 Mock 時間 |
+| `DATE` | `@date(now)` | 當前 Mock 日期 |
 
 ## 變數擷取
 
-使用 `>` 和 `<` 配對擷取資料庫自動產生的值（如 auto-increment ID）：
+INSERT 後，可透過 `>` 和 `<` 配對從資料庫反查自動產生的欄位值（如 auto-increment ID），並存入變數供後續步驟使用：
+
+- **`>variableName`**（header row）：定義變數名稱，用於儲存擷取的值
+- **`<columnName`**（data row）：指定要從資料庫反查的欄位名稱
 
 ```gherkin
-Given 準備一個訂單, with table:
-  | >order1.id | >order1.number | customerId | amount |
-  | <orderId   | <orderNumber   | $Alice.id  | 1000   |
+Given 準備一個使用者, with table:
+  | >Alice.id | >Alice.createdAt | name  | email             | status |
+  | <userId   | <createdAt       | Alice | alice@example.com | ACTIVE |
 ```
 
-執行後：
-- `order1.id` = 資料庫產生的 `orderId`
-- `order1.number` = 資料庫產生的 `orderNumber`
+執行流程：
+1. 將 `name`、`email`、`status` 寫入資料庫
+2. 從資料庫反查 `userId` 欄位值 → 存入變數 `Alice.id`
+3. 從資料庫反查 `createdAt` 欄位值 → 存入變數 `Alice.createdAt`
 
 ## 引用變數
 

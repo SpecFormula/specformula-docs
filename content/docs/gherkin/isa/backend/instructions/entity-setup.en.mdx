@@ -5,9 +5,9 @@ description: Prepare test data with declarative syntax
 
 EntitySetup lets you declare test precondition data directly in Gherkin, without writing INSERT statements in Step Definitions.
 
-## Mapping to Entity Mapping
+## Mapping to Entity Spec
 
-The EntitySetup instruction maps business entity names to actual database tables through **entity_to_table_mapping.yml**.
+The EntitySetup instruction maps business entity names to actual database tables through **Entity Spec**, and validates fields against the DDL.
 
 ### Mapping Mechanism
 
@@ -20,8 +20,18 @@ entity_to_table_mapping:
   - product: products
 ```
 
+```sql
+-- schema.sql
+CREATE TABLE users (
+    user_id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(100) NOT NULL,
+    email VARCHAR(255) NOT NULL UNIQUE,
+    status VARCHAR(20) DEFAULT 'ACTIVE',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+```
+
 ```gherkin
-# Gherkin uses business language
 Given prepare a user, with table:
   | name  | email             |
   | Alice | alice@example.com |
@@ -30,13 +40,11 @@ Given prepare a user, with table:
 # INSERT INTO users (name, email) VALUES ('Alice', 'alice@example.com')
 ```
 
-### Mapping Table
-
 | Gherkin Element | Mapping Source |
 |-----------------|----------------|
 | `user` | `entity_to_table_mapping` key |
 | `users` table | `entity_to_table_mapping` value |
-| `name`, `email` fields | Database table Schema definition |
+| `name`, `email` fields | DDL column definition |
 
 ### Naming Conventions
 
@@ -58,29 +66,16 @@ entity_to_table_mapping:
 **Field name conversion**: DataTable uses camelCase, automatically mapped to database snake_case
 
 ```
-Gherkin: userId      → DB: user_id
-Gherkin: orderDate   → DB: order_date
-Gherkin: createdAt   → DB: created_at
-Gherkin: isActive    → DB: is_active
+Gherkin: userId    → DB: user_id
+Gherkin: createdAt → DB: created_at
 ```
 
 ### Schema Validation
 
-SpecFormula reads database Schema to validate that fields in DataTable exist:
-
-```sql
--- src/test/resources/specs/data/schema.sql
-CREATE TABLE users (
-    user_id BIGINT AUTO_INCREMENT PRIMARY KEY,
-    name VARCHAR(100) NOT NULL,
-    email VARCHAR(255) NOT NULL UNIQUE,
-    status VARCHAR(20) DEFAULT 'ACTIVE',
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-```
+SpecFormula validates that fields in DataTable exist against the DDL:
 
 ```gherkin
-# ✅ Correct: fields exist in Schema
+# ✅ Correct: fields exist in DDL
 Given prepare a user, with table:
   | name  | email             | status |
   | Alice | alice@example.com | ACTIVE |
@@ -101,10 +96,10 @@ Given prepare a user, with table:
   | <userId   | Alice | alice@example.com | ACTIVE |
 ```
 
-This syntax will:
-1. Insert a record into the `users` table
-2. Query back the auto-generated `userId` from the database
-3. Store `userId` in variable `Alice.id`
+This instruction will:
+1. Map `user` to the `users` table via Entity Spec and retrieve column definitions
+2. Insert a record with `name = Alice`, `email = alice@example.com`, `status = ACTIVE` into the database
+3. Query back the `user_id` column value from database, store in variable `Alice.id`
 
 ## Why Not Use API to Create Precondition Data?
 
@@ -122,41 +117,36 @@ Given prepare a user, with table:
   | Alice | alice@example.com |
 ```
 
-## Field Name Conversion
-
-DataTable uses camelCase, the framework automatically maps to database snake_case:
-
-```
-DataTable: orderDate  → DB: order_date
-DataTable: userId     → DB: user_id
-DataTable: createdAt  → DB: created_at
-```
-
 ## Type Conversion
 
-Values in DataTable are all strings, the framework auto-converts based on database column definitions:
+Values in DataTable are all strings. The framework auto-converts based on the column type defined in DDL (e.g., `INT`, `DATE`, `DATETIME`):
 
-| Input | Conversion Result |
-|-------|-------------------|
-| `"123"` | Integer / Long / BigDecimal |
-| `"2026-01-27"` | LocalDate |
-| `"2026-01-27T10:00:00"` | LocalDateTime |
-| `@time(now)` | Current Mock time |
-| `@date(now-1d)` | Yesterday's date |
+| DDL Column Type | DataTable Input | Conversion Result |
+|----------------|-----------------|-------------------|
+| `INT` / `BIGINT` | `"123"` | Integer / Long |
+| `DECIMAL` | `"99.99"` | BigDecimal |
+| `DATE` | `"2026-01-27"` | LocalDate |
+| `DATETIME` / `TIMESTAMP` | `"2026-01-27T10:00:00"` | LocalDateTime |
+| `DATETIME` / `TIMESTAMP` | `@time(now)` | Current Mock time |
+| `DATE` | `@date(now)` | Current Mock date |
 
 ## Variable Extraction
 
-Use `>` and `<` pairs to extract auto-generated values from the database (e.g., auto-increment ID):
+After INSERT, use `>` and `<` pairs to query back auto-generated column values (e.g., auto-increment ID) from the database and store them in variables for subsequent steps:
+
+- **`>variableName`** (header row): Defines the variable name to store the extracted value
+- **`<columnName`** (data row): Specifies the database column name to query back
 
 ```gherkin
-Given prepare an order, with table:
-  | >order1.id | >order1.number | customerId | amount |
-  | <orderId   | <orderNumber   | $Alice.id  | 1000   |
+Given prepare a user, with table:
+  | >Alice.id | >Alice.createdAt | name  | email             | status |
+  | <userId   | <createdAt       | Alice | alice@example.com | ACTIVE |
 ```
 
-After execution:
-- `order1.id` = `orderId` generated by database
-- `order1.number` = `orderNumber` generated by database
+Execution flow:
+1. Write `name`, `email`, `status` to the database
+2. Query back `userId` column value from database → store in variable `Alice.id`
+3. Query back `createdAt` column value from database → store in variable `Alice.createdAt`
 
 ## Variable Reference
 
