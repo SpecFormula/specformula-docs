@@ -11,7 +11,7 @@ SpecFormula 提供三套符號系統，讓你在 Gherkin 中表達變數、約�
 |----------|------|----------|
 | [VAR](/docs/gherkin/isa/backend/symbols/var) | 變數擷取與引用 | `>contextKey`、`$variable` |
 | [CAS](/docs/gherkin/isa/backend/symbols/cas) | 約束斷言 | `&isNum`、`&gt(100)` |
-| [TIME](/docs/gherkin/isa/backend/symbols/time) | 時間表達式 | `@time(now)`、`@date(2025-12-25)` |
+| [TIME](/docs/gherkin/isa/backend/symbols/time) | 時間表達式 | `@time("now")`、`@date("2025-12-25")` |
 
 ## 快速對照
 
@@ -56,7 +56,7 @@ SpecFormula 提供三套符號系統，讓你在 Gherkin 中表達變數、約�
 
 # 相對時間
 | dueDate        |
-| @time(now+7d)  |
+| @time("now+7d")  |
 
 # 僅日期
 | birthday             |

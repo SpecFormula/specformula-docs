@@ -13,7 +13,7 @@ Given 現在時間為 "2026-01-27T10:00:00"
 
 這段指令會：
 1. 將 MockTime 介面的回傳時間設為 `2026-01-27T10:00:00`
-2. 所有使用 `now` 的時間符號（如 `@time(now)`、`@date(now)`）和 CAS 時間約束（如 `&sameTime(now)`）都會以此時間為基準
+2. 所有使用 `now` 的時間符號（如 `@time("now")`、`@date("now")`）和 CAS 時間約束（如 `&sameTime("now")`）都會以此時間為基準
 
 ## 為什麼需要控制時間？
 
@@ -50,18 +50,18 @@ TimeControl 設定的時間會影響所有使用 `now` 關鍵字的表達式：
 
 | 符號 | 說明 |
 |------|------|
-| `@time(now)` | 回傳 MockTime 的當前時間 |
-| `@time(now+1d)` | 基於 MockTime 當前時間的相對計算 |
-| `@date(now)` | 回傳 MockTime 的當前日期 |
-| `@localtime(now)` | 回傳 MockTime 的當前時間（僅時間） |
+| `@time("now")` | 回傳 MockTime 的當前時間 |
+| `@time("now+1d")` | 基於 MockTime 當前時間的相對計算 |
+| `@date("now")` | 回傳 MockTime 的當前日期 |
+| `@localtime("now")` | 回傳 MockTime 的當前時間（僅時間） |
 
 ### CAS 時間約束
 
 | 約束 | 說明 |
 |------|------|
-| `&sameTime(now)` | 驗證值等於 MockTime 的當前時間 |
-| `&before(now)` | 驗證值早於 MockTime 的當前時間 |
-| `&after(now)` | 驗證值晚於 MockTime 的當前時間 |
+| `&sameTime("now")` | 驗證值等於 MockTime 的當前時間 |
+| `&before("now")` | 驗證值早於 MockTime 的當前時間 |
+| `&after("now")` | 驗證值晚於 MockTime 的當前時間 |
 
 時間符號與 CAS 時間約束可用於任何指令的 DataTable 欄位中。
 
@@ -95,7 +95,7 @@ Feature: 待辦事項時間控制
       | $todo1.id | &sameTime("2026-01-27T10:00:00") |
 
     # 2. 推進時間 1 天
-    Given 現在時間為 "@time(now+1d)"
+    Given 現在時間為 "@time("now+1d")"
 
     # 3. 更新待辦事項（updatedAt = 2026-01-28T10:00:00）
     When (UID="$Alice.id") 更新待辦事項, call table:

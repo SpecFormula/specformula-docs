@@ -11,7 +11,7 @@ SpecFormula provides three symbol systems that let you express variables, constr
 |---------------|---------|----------------|
 | [VAR](/docs/gherkin/isa/backend/symbols/var) | Variable extraction and reference | `>contextKey`, `$variable` |
 | [CAS](/docs/gherkin/isa/backend/symbols/cas) | Constraint assertions | `&isNum`, `&gt(100)` |
-| [TIME](/docs/gherkin/isa/backend/symbols/time) | Time expressions | `@time(now)`, `@date(2025-12-25)` |
+| [TIME](/docs/gherkin/isa/backend/symbols/time) | Time expressions | `@time("now")`, `@date("2025-12-25")` |
 
 ## Quick Reference
 
@@ -56,7 +56,7 @@ SpecFormula provides three symbol systems that let you express variables, constr
 
 # Relative time
 | dueDate        |
-| @time(now+7d)  |
+| @time("now+7d")  |
 
 # Date only
 | birthday             |

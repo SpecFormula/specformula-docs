@@ -13,7 +13,7 @@ Given current time is "2026-01-27T10:00:00"
 
 This instruction will:
 1. Set the MockTime interface return time to `2026-01-27T10:00:00`
-2. All time symbols (e.g., `@time(now)`, `@date(now)`) and CAS time constraints (e.g., `&sameTime(now)`) that use `now` will be based on this time
+2. All time symbols (e.g., `@time("now")`, `@date("now")`) and CAS time constraints (e.g., `&sameTime("now")`) that use `now` will be based on this time
 
 ## Why Control Time?
 
@@ -50,18 +50,18 @@ The time set by TimeControl affects all expressions that use the `now` keyword:
 
 | Symbol | Description |
 |--------|-------------|
-| `@time(now)` | Returns the current MockTime |
-| `@time(now+1d)` | Relative calculation based on current MockTime |
-| `@date(now)` | Returns the current MockTime date |
-| `@localtime(now)` | Returns the current MockTime time (time only) |
+| `@time("now")` | Returns the current MockTime |
+| `@time("now+1d")` | Relative calculation based on current MockTime |
+| `@date("now")` | Returns the current MockTime date |
+| `@localtime("now")` | Returns the current MockTime time (time only) |
 
 ### CAS Time Constraints
 
 | Constraint | Description |
 |------------|-------------|
-| `&sameTime(now)` | Validates value equals the current MockTime |
-| `&before(now)` | Validates value is before the current MockTime |
-| `&after(now)` | Validates value is after the current MockTime |
+| `&sameTime("now")` | Validates value equals the current MockTime |
+| `&before("now")` | Validates value is before the current MockTime |
+| `&after("now")` | Validates value is after the current MockTime |
 
 Time symbols and CAS time constraints can be used in DataTable fields of any instruction.
 
@@ -95,7 +95,7 @@ Feature: Todo Time Control
       | $todo1.id | &sameTime("2026-01-27T10:00:00") |
 
     # 2. Advance time by 1 day
-    Given current time is "@time(now+1d)"
+    Given current time is "@time("now+1d")"
 
     # 3. Update todo (updatedAt = 2026-01-28T10:00:00)
     When (UID="$Alice.id") update todo, call table:

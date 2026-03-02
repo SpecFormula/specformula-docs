@@ -62,7 +62,7 @@ When mock time is set via [TimeControl](/docs/gherkin/isa/backend/instructions/t
 Given current time is "2026-02-01T10:00:00"
 When create log, call table:
   | logTime       |
-  | @time(now-1d) |    # → 2026-01-31T10:00:00
+  | @time("now-1d") |    # → 2026-01-31T10:00:00
 ```
 
 ## Timezone Handling
@@ -127,7 +127,7 @@ Feature: Time Expressions
     # Relative time
     Given prepare a task, with table:
       | name   | dueDate        |
-      | Report | @time(now+7d)  |
+      | Report | @time("now+7d")  |
 
     # Date only
     Given prepare a user, with table:

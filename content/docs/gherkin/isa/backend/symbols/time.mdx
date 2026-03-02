@@ -56,13 +56,13 @@ TIME-System 提供三個函式，將宣告式的時間表達式轉換為型別�
 
 ## 搭配 Mock 時間
 
-當透過 [TimeControl](/docs/isa/instructions/time-control) 設定 Mock 時間時，`now` 會使用 Mock 時間：
+當透過 [TimeControl](/docs/gherkin/isa/backend/instructions/time-control) 設定 Mock 時間時，`now` 會使用 Mock 時間：
 
 ```gherkin
 Given 現在時間為 "2026-02-01T10:00:00"
 When 創建日誌, call table:
   | logTime       |
-  | @time(now-1d) |    # → 2026-01-31T10:00:00
+  | @time("now-1d") |    # → 2026-01-31T10:00:00
 ```
 
 ## 時區處理
@@ -127,7 +127,7 @@ Feature: 時間表達式
     # 相對時間
     Given 準備一個任務, with table:
       | name   | dueDate        |
-      | 報告   | @time(now+7d)  |
+      | 報告   | @time("now+7d")  |
 
     # 僅日期
     Given 準備一個使用者, with table:
