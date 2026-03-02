@@ -1,0 +1,86 @@
+---
+title: Custom Instructions
+description: Extend SpecFormula with Cucumber Step Definitions, paired with isa.yml contracts for Linter validation
+---
+
+SpecFormula ships with five built-in instructions (`time_control`, `entity_setup`, `api_call`, `response_validate`, `entity_validate`) that cover the most common test operations. When your project requires functionality beyond these built-in types, developers can write custom instructions to extend the framework.
+
+## What Are Custom Instructions
+
+Custom instructions consist of two parts:
+
+| Part | What It Does | Purpose |
+|------|-------------|---------|
+| **Cucumber Step Definition** | Developer writes Java code implementing the instruction's execution logic | Makes the instruction actually run |
+| **isa.yml Configuration** | Register `instruction_type: custom` in `isa.yml`, declaring format and contracts | Enables Linter to validate feature file syntax |
+
+This is also the core difference between custom and built-in instructions — built-in instructions have their Step Definitions provided by SpecFormula, while custom instructions have their Step Definitions written by the developer.
+
+## Use Cases
+
+- **DSL-level semantic encapsulation**: Wrap multi-step data preparation into a single instruction. For example, `"SAM" is an admin` might create an account, assign a role, and set default values behind the scenes.
+- **Third-party service integration**: Mock external APIs, access Redis, upload files, and other operations not supported by built-in instructions.
+- **Repeated multi-step boilerplate**: When multiple feature files repeatedly use the same EntitySetup combinations, encapsulate them into a single instruction so the Gherkin only expresses test-specific differences.
+
+Poor candidates: one-off steps, or operations achievable with two or three EntitySetup steps — use built-in instructions directly.
+
+## Workflow
+
+Creating a custom instruction involves two steps:
+
+### Step 1: Define Configuration in isa.yml
+
+First, register the instruction's format and contract in `isa.yml` so the Linter can identify and validate usage in feature files:
+
+```yaml
+instructions:
+  - name: Admin setup
+    format: ^"(?P<alias>[^"]+)" is an admin$
+    instruction_type: custom
+
+    export_vars:
+      "{{alias}}.id":
+        type: Number
+        description: "Admin ID"
+        nullable: false
+
+    datatable_parameters: {}
+```
+
+The configuration follows a three-layer contract, where only the Syntax Layer (`format`) is required:
+
+| Layer | Field | Responsibility |
+|-------|-------|----------------|
+| Syntax | `format` | Regex pattern that identifies step ownership and captures parameters |
+| Output | `export_vars` | Declares `$var` exported after execution, for Linter to validate subsequent references |
+| Input | `datatable_parameters` | Declares DataTable fields, for Linter to validate spelling and types |
+
+See [Config](/docs/gherkin/isa/backend/custom/config) for complete field definitions.
+
+### Step 2: Write Cucumber Step Definition
+
+Write the corresponding Step Definition based on the regex defined in `format`, implementing the instruction's execution logic:
+
+```java
+public class AdminSetupSteps {
+
+    @Autowired
+    private ScenarioContextAccessor context;
+
+    @Given("\"({alias})\" is an admin")
+    public void adminSetup(String alias) {
+        // 1. Execute business logic (create account, assign role...)
+        Long adminId = createAdmin();
+
+        // 2. Store result in context, key must match export_vars declaration
+        context.putObject(alias + ".id", adminId);
+    }
+}
+```
+
+In Step Definitions, you can use built-in instructions and the symbol system through Spring Beans provided by SpecFormula. See [Development Recommendations](/docs/gherkin/isa/backend/custom/dev-recommendations) for details.
+
+## Chapter Navigation
+
+- [Config](/docs/gherkin/isa/backend/custom/config): Complete field definitions for `export_vars`, `datatable_parameters`, and `allow_dynamic_parameters`
+- [Development Recommendations](/docs/gherkin/isa/backend/custom/dev-recommendations): Step Definition implementation guide and SpecFormula development API reference
