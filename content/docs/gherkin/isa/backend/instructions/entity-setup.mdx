@@ -5,6 +5,53 @@ description: 以宣告式語法準備測試資料
 
 EntitySetup 讓你直接在 Gherkin 中宣告測試的前置資料，無需在 Step Definition 中撰寫 INSERT 語句。
 
+## 基本用法
+
+```gherkin
+Given 準備一個使用者, with table:
+  | >Alice.id | name  | email             | status |
+  | <userId   | Alice | alice@example.com | ACTIVE |
+```
+
+這段指令會：
+1. 透過 Entity Spec 將「使用者」對應到 `users` 資料表，並取得欄位定義
+2. 新增一筆 `name = Alice`、`email = alice@example.com`、`status = ACTIVE` 的資料寫入資料庫
+3. 從資料庫反查 `user_id` 欄位值，存入變數 `Alice.id`
+
+## 變數擷取
+
+INSERT 後，可透過 `>` 和 `<` 配對從資料庫反查自動產生的欄位值（如 auto-increment ID），並存入變數供後續步驟使用：
+
+- **`>variableName`**（header row）：定義變數名稱，用於儲存擷取的值
+- **`<columnName`**（data row）：指定要從資料庫反查的欄位名稱
+
+```gherkin
+Given 準備一個使用者, with table:
+  | >Alice.id | >Alice.createdAt | name  | email             | status |
+  | <userId   | <createdAt       | Alice | alice@example.com | ACTIVE |
+```
+
+執行流程：
+1. 將 `name`、`email`、`status` 寫入資料庫
+2. 從資料庫反查 `userId` 欄位值 → 存入變數 `Alice.id`
+3. 從資料庫反查 `createdAt` 欄位值 → 存入變數 `Alice.createdAt`
+
+## 引用變數
+
+使用 `$variable` 引用先前儲存的變數：
+
+```gherkin
+Given 準備一個使用者, with table:
+  | >Alice.id | name  |
+  | <userId   | Alice |
+
+Given 準備一個待辦事項, with table:
+  | userId    | title  |
+  | $Alice.id | 買牛奶 |
+```
+
+---
+
 ## 與 Entity Spec 的對應關係
 
 EntitySetup 指令透過 **Entity Spec** 將業務實體名稱對應到實際的資料表，並根據 DDL 驗證欄位是否存在。
@@ -86,21 +133,6 @@ Given 準備一個使用者, with table:
   | Alice | alice@example.com |
 ```
 
----
-
-## 基本用法
-
-```gherkin
-Given 準備一個使用者, with table:
-  | >Alice.id | name  | email             | status |
-  | <userId   | Alice | alice@example.com | ACTIVE |
-```
-
-這段指令會：
-1. 透過 Entity Spec 將「使用者」對應到 `users` 資料表，並取得欄位定義
-2. 新增一筆 `name = Alice`、`email = alice@example.com`、`status = ACTIVE` 的資料寫入資料庫
-3. 從資料庫反查 `user_id` 欄位值，存入變數 `Alice.id`
-
 ## 為什麼不用 API 建立前置資料？
 
 透過 API 建立前置資料會造成測試耦合——如果「建立使用者」API 有 bug，所有依賴該使用者的測試都會連帶失敗，即使被測功能完全正確。
@@ -130,38 +162,6 @@ DataTable 中的值皆為字串，框架會根據 DDL 中對應欄位的型別�
 | `DATETIME` / `TIMESTAMP` | `@time(now)` | 當前 Mock 時間 |
 | `DATE` | `@date(now)` | 當前 Mock 日期 |
 
-## 變數擷取
-
-INSERT 後，可透過 `>` 和 `<` 配對從資料庫反查自動產生的欄位值（如 auto-increment ID），並存入變數供後續步驟使用：
-
-- **`>variableName`**（header row）：定義變數名稱，用於儲存擷取的值
-- **`<columnName`**（data row）：指定要從資料庫反查的欄位名稱
-
-```gherkin
-Given 準備一個使用者, with table:
-  | >Alice.id | >Alice.createdAt | name  | email             | status |
-  | <userId   | <createdAt       | Alice | alice@example.com | ACTIVE |
-```
-
-執行流程：
-1. 將 `name`、`email`、`status` 寫入資料庫
-2. 從資料庫反查 `userId` 欄位值 → 存入變數 `Alice.id`
-3. 從資料庫反查 `createdAt` 欄位值 → 存入變數 `Alice.createdAt`
-
-## 引用變數
-
-使用 `$variable` 引用先前儲存的變數：
-
-```gherkin
-Given 準備一個使用者, with table:
-  | >Alice.id | name  |
-  | <userId   | Alice |
-
-Given 準備一個待辦事項, with table:
-  | userId    | title  |
-  | $Alice.id | 買牛奶 |
-```
-
 ## 錯誤處理
 
 ### Lint 階段
@@ -184,14 +184,21 @@ Feature: 新增待辦事項
 
   Background:
     Given 現在時間為 "2026-01-27T10:00:00"
+
+    # EntitySetup 指令 — 準備使用者資料
+    # >Alice.id / <userId：INSERT 後反查 userId 存入 Alice.id
     Given 準備一個使用者, with table:
       | >Alice.id | name  | email             | passwordHash | status |
       | <userId   | Alice | alice@example.com | password123  | ACTIVE |
 
   Example: 新增一筆待辦事項
+
+    # ApiCall 指令（參見 ApiCall 文件）
     When (UID="$Alice.id") 新增待辦事項, call table:
       | >todo1.id | title  |
       | <todoId   | 買牛奶 |
+
+    # ResponseValidate 指令（參見 ResponseValidate 文件）
     Then 新增待辦事項(201)回應, with table:
       | todoId    | userId    | title  |
       | $todo1.id | $Alice.id | 買牛奶 |

@@ -5,6 +5,37 @@ description: 驗證資料庫記錄的不存在性
 
 EntityNonExistenceValidate 讓你驗證記錄已從資料庫中刪除，常用於測試刪除操作。
 
+## 基本用法
+
+```gherkin
+Then 應該不存在一個待辦事項, with table:
+  | todoId    | userId    |
+  | $todo1.id | $Alice.id |
+```
+
+這段指令會：
+1. 透過 Entity Spec 將「待辦事項」對應到 `todos` 資料表，並取得欄位定義
+2. 以提供的欄位作為查詢條件
+3. 驗證查詢結果為空（記錄不存在）
+
+## 使用場景
+
+刪除操作後，確認記錄已從資料庫移除：
+
+```gherkin
+When (UID="$Alice.id") 刪除待辦事項, call table:
+  | P:todoId  |
+  | $todo1.id |
+Then 刪除待辦事項(200)回應, with table:
+  | message  |
+  | 刪除成功 |
+Then 應該不存在一個待辦事項, with table:
+  | todoId    |
+  | $todo1.id |
+```
+
+---
+
 ## 與 Entity Spec 的對應關係
 
 EntityNonExistenceValidate 指令透過 **Entity Spec** 將業務實體名稱對應到實際的資料表，並根據 DDL 驗證欄位是否存在。
@@ -42,35 +73,6 @@ Then 應該不存在一個待辦事項, with table:
 | `待辦事項` | `entity_to_table_mapping` 的 key |
 | `todos` 資料表 | `entity_to_table_mapping` 的 value |
 | `todoId` 欄位 | DDL 欄位定義 |
-
-## 基本用法
-
-```gherkin
-Then 應該不存在一個待辦事項, with table:
-  | todoId    | userId    |
-  | $todo1.id | $Alice.id |
-```
-
-這段指令會：
-1. 透過 Entity Spec 將「待辦事項」對應到 `todos` 資料表，並取得欄位定義
-2. 以提供的欄位作為查詢條件
-3. 驗證查詢結果為空（記錄不存在）
-
-## 使用場景
-
-刪除操作後，確認記錄已從資料庫移除：
-
-```gherkin
-When (UID="$Alice.id") 刪除待辦事項, call table:
-  | P:todoId  |
-  | $todo1.id |
-Then 刪除待辦事項(200)回應, with table:
-  | message  |
-  | 刪除成功 |
-Then 應該不存在一個待辦事項, with table:
-  | todoId    |
-  | $todo1.id |
-```
 
 ## 查找策略
 
@@ -128,20 +130,29 @@ Then 應該不存在一個待辦事項, with table:
 Feature: 刪除待辦事項
 
   Background:
+    # EntitySetup 指令（參見 EntitySetup 文件）
     Given 準備一個使用者, with table:
       | >Alice.id | name  | email             | status |
       | <userId   | Alice | alice@example.com | ACTIVE |
 
   Example: 刪除一筆待辦事項
+
+    # ApiCall 指令（參見 ApiCall 文件）
     When (UID="$Alice.id") 新增待辦事項, call table:
       | >todo1.id | title  |
       | <todoId   | 買牛奶 |
+
+    # ApiCall 指令 — P: 前綴表示 Path 參數
     When (UID="$Alice.id") 刪除待辦事項, call table:
       | P:todoId  |
       | $todo1.id |
+
+    # ResponseValidate 指令（參見 ResponseValidate 文件）
     Then 刪除待辦事項(200)回應, with table:
       | message  |
       | 刪除成功 |
+
+    # EntityNonExistenceValidate 指令 — 驗證記錄已刪除
     And 應該不存在一個待辦事項, with table:
       | todoId    | userId    |
       | $todo1.id | $Alice.id |

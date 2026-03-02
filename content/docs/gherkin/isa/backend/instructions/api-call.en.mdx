@@ -5,7 +5,49 @@ description: Execute HTTP API requests with declarative syntax
 
 ApiCall lets you declare API call parameters and response extraction directly in Gherkin, without writing HTTP request code.
 
-## Mapping to OpenAPI Spec
+## Basic Usage
+
+```gherkin
+When (UID="$Alice.id") create todo, call table:
+  | >todo1.id | title    |
+  | <todoId   | Buy milk |
+```
+
+This instruction will:
+1. Use `$Alice.id` as the caller identity (Bearer Token)
+2. Call the API with summary "create todo" in the API Spec
+3. Send `title: Buy milk` as the Request Body
+4. Extract the `todoId` field from the response and store it in variable `todo1.id`
+
+## Field Syntax
+
+DataTable field names support special prefixes to specify parameter types:
+
+| Prefix | Purpose | Example |
+|--------|---------|---------|
+| (none) | Request Body field; if the field name also exists as a Path/Query/Header parameter in the API Spec, it is automatically routed to the matching position (syntax sugar, equivalent to also writing `P:`/`Q:`/`H:`) | `title`, `todoId` |
+| `P:` | Path parameter | `P:todoId` → replaces `{todoId}` in URL |
+| `Q:` | Query parameter | `Q:page` → `?page=value` |
+| `H:` | HTTP Header | `H:X-Trace-Id` |
+| `>` | Store into variable — defines the variable name to save the response value | `>todo1.id` |
+| `<` | Extract from response — specifies the source field in the response JSON | `<todoId` |
+
+### Variable Extraction Pairing
+
+`>` and `<` must be paired vertically in the same column: the header holds the variable name (`>`), and the row holds the source field (`<`).
+
+```gherkin
+| >todo1.id | >todo1.title | title    |
+| <todoId   | <title       | Buy milk |
+```
+
+After execution:
+- `todo1.id` = value of `todoId` from response
+- `todo1.title` = value of `title` from response
+
+---
+
+## Mapping to API Spec
 
 The ApiCall instruction identifies the API to call using the **summary** field. This design allows test files to use business language rather than technical URL paths.
 
@@ -52,7 +94,7 @@ When (UID="$Alice.id") create todo, call table:
 
 ### Mapping Table
 
-| Gherkin Element | OpenAPI Spec Source |
+| Gherkin Element | API Spec Source |
 |-----------------|---------------------|
 | `create todo` | `paths.*.*.summary` |
 | HTTP Method | Inferred from path definition (`post`, `get`, `put`, `delete`) |
@@ -64,7 +106,7 @@ When (UID="$Alice.id") create todo, call table:
 
 ### Summary Uniqueness Requirement
 
-Each API operation's `summary` must be unique across the entire OpenAPI Spec:
+Each API operation's `summary` must be unique across the entire API Spec:
 
 ```yaml
 # ✅ Correct: summaries are distinct
@@ -91,51 +133,9 @@ Each API operation's `summary` must be unique across the entire OpenAPI Spec:
     summary: get todo    # Duplicate!
 ```
 
----
-
-## Basic Usage
-
-```gherkin
-When (UID="$Alice.id") create todo, call table:
-  | >todo1.id | title    |
-  | <todoId   | Buy milk |
-```
-
-This syntax will:
-1. Use `$Alice.id` as the caller identity (Bearer Token)
-2. Call the API with summary "create todo" in the OpenAPI Spec
-3. Send `title: Buy milk` as the Request Body
-4. Extract the `todoId` field from the response and store it in variable `todo1.id`
-
-## Field Syntax
-
-DataTable field names support special prefixes to specify parameter types:
-
-| Prefix | Purpose | Example |
-|--------|---------|---------|
-| (none) | Request Body field | `title` |
-| `P:` | Path parameter | `P:todoId` → replaces `{todoId}` in URL |
-| `Q:` | Query parameter | `Q:page` → `?page=value` |
-| `H:` | HTTP Header | `H:X-Trace-Id` |
-| `>` | Variable name to extract to | `>todo1.id` |
-| `<` | Response field source | `<todoId` |
-
-### Variable Extraction Pairing
-
-`>` and `<` must be used in pairs within the same column:
-
-```gherkin
-| >todo1.id | >todo1.title | title    |
-| <todoId   | <title       | Buy milk |
-```
-
-After execution:
-- `todo1.id` = value of `todoId` from response
-- `todo1.title` = value of `title` from response
-
 ## Automatic Parameter Classification
 
-When a Body field name matches a Path/Query/Header parameter name in the OpenAPI Spec, ApiCall automatically routes it without requiring a prefix:
+When a Body field name matches a Path/Query/Header parameter name in the API Spec, the value is sent as a Body field and also automatically routed to the matching parameter position, without requiring a `P:` or `Q:` prefix:
 
 ```gherkin
 # todoId is both Body and Path parameter → automatically routes to P:todoId
@@ -177,6 +177,8 @@ When (No Actor) health check, call table:
   | |
 ```
 
+Even when there are no parameters, an empty DataTable is required to satisfy the syntax.
+
 ## Time Format
 
 Time values in ApiCall are automatically converted based on the `time_format` setting in `isa.yml`:
@@ -195,7 +197,7 @@ Time values in ApiCall are automatically converted based on the `time_format` se
 
 | Error | Description |
 |-------|-------------|
-| Field not found | Field name in DataTable not found in OpenAPI Spec |
+| Field not found | Field name in DataTable not found in API Spec |
 | Missing required field | Parameter marked as required in OpenAPI not provided |
 | Extract field not found | Field specified with `<` not found in Response Schema |
 
@@ -203,7 +205,7 @@ Time values in ApiCall are automatically converted based on the `time_format` se
 
 | Error | Description |
 |-------|-------------|
-| API not found | Summary not found in OpenAPI Spec |
+| API not found | Summary not found in API Spec |
 | Duplicate summary | Multiple operations use the same summary, cannot uniquely identify |
 
 ## Complete Example
@@ -213,26 +215,32 @@ Feature: Todo Management
 
   Background:
     Given current time is "2026-01-27T10:00:00"
+
+    # EntitySetup instruction — prepare test data (see EntitySetup docs)
+    # >Alice.id / <userId: extract userId from response into Alice.id variable
     Given prepare a user, with table:
       | >Alice.id | name  | email             | status |
       | <userId   | Alice | alice@example.com | ACTIVE |
 
   Example: Create and update a todo
-    # Login to get Token
+
+    # (No Actor): API call without authentication
+    # >AliceToken / <token: extract token from response
     When (No Actor) user login, call table:
       | >AliceToken | email             | password    |
       | <token      | alice@example.com | password123 |
 
-    # Create todo
+    # (UID="$Alice.id"): call as Alice, Bearer Token injected automatically
     When (UID="$Alice.id") create todo, call table:
       | >todo1.id | title    |
       | <todoId   | Buy milk |
 
-    # Update todo (using Path parameter)
+    # P: prefix for Path parameter; $todo1.id references a previously extracted variable
     When (UID="$Alice.id") update todo, call table:
       | P:todoId  | title        |
       | $todo1.id | Buy soy milk |
 
+    # ResponseValidate instruction — verify response (see ResponseValidate docs)
     Then update todo(200) response, with table:
       | todoId    | title        | updatedAt                        |
       | $todo1.id | Buy soy milk | &sameTime("2026-01-27T10:00:00") |

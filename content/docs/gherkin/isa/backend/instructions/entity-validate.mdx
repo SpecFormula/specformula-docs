@@ -5,6 +5,37 @@ description: 驗證資料庫記錄的存在性與正確性
 
 EntityValidate 讓你直接在 Gherkin 中驗證資料庫狀態，確保資料真正寫入或更新而非只是 API 回傳正確。
 
+## 基本用法
+
+```gherkin
+Then 應該存在一個待辦事項, with table:
+  | todoId    | userId    | title  | completed |
+  | $todo1.id | $Alice.id | 買牛奶 | false     |
+```
+
+這段指令會：
+1. 透過 Entity Spec 將「待辦事項」對應到 `todos` 資料表，並取得欄位定義
+2. 以 `todoId` 作為主鍵查詢資料表
+3. 逐欄位驗證實際值是否符合預期
+
+## 為什麼需要驗證資料庫？
+
+ResponseValidate 只驗證 API 回應，無法確認資料是否真正寫入資料庫：
+
+```gherkin
+# API 回應可能正確，但資料庫可能沒寫入
+Then 新增待辦事項(201)回應, with table:
+  | todoId    | title  |
+  | $todo1.id | 買牛奶 |
+
+# 直接查資料庫，確保資料持久化正確
+And 應該存在一個待辦事項, with table:
+  | todoId    | title  |
+  | $todo1.id | 買牛奶 |
+```
+
+---
+
 ## 與 Entity Spec 的對應關係
 
 EntityValidate 指令透過 **Entity Spec** 將業務實體名稱對應到實際的資料表，並根據 DDL 驗證欄位是否存在。
@@ -42,35 +73,6 @@ Then 應該存在一個待辦事項, with table:
 | `待辦事項` | `entity_to_table_mapping` 的 key |
 | `todos` 資料表 | `entity_to_table_mapping` 的 value |
 | `todoId`, `title` 欄位 | DDL 欄位定義 |
-
-## 基本用法
-
-```gherkin
-Then 應該存在一個待辦事項, with table:
-  | todoId    | userId    | title  | completed |
-  | $todo1.id | $Alice.id | 買牛奶 | false     |
-```
-
-這段指令會：
-1. 透過 Entity Spec 將「待辦事項」對應到 `todos` 資料表，並取得欄位定義
-2. 以 `todoId` 作為主鍵查詢資料表
-3. 逐欄位驗證實際值是否符合預期
-
-## 為什麼需要驗證資料庫？
-
-ResponseValidate 只驗證 API 回應，無法確認資料是否真正寫入資料庫：
-
-```gherkin
-# API 回應可能正確，但資料庫可能沒寫入
-Then 新增待辦事項(201)回應, with table:
-  | todoId    | title  |
-  | $todo1.id | 買牛奶 |
-
-# 直接查資料庫，確保資料持久化正確
-And 應該存在一個待辦事項, with table:
-  | todoId    | title  |
-  | $todo1.id | 買牛奶 |
-```
 
 ## 查找策略
 
@@ -164,17 +166,26 @@ Feature: 新增待辦事項
 
   Background:
     Given 現在時間為 "2026-01-27T10:00:00"
+
+    # EntitySetup 指令（參見 EntitySetup 文件）
     Given 準備一個使用者, with table:
       | >Alice.id | name  | email             | status |
       | <userId   | Alice | alice@example.com | ACTIVE |
 
   Example: 驗證待辦事項寫入資料庫
+
+    # ApiCall 指令（參見 ApiCall 文件）
     When (UID="$Alice.id") 新增待辦事項, call table:
       | >todo1.id | title  | description |
       | <todoId   | 買牛奶 | 去全聯買    |
+
+    # ResponseValidate 指令（參見 ResponseValidate 文件）
     Then 新增待辦事項(201)回應, with table:
       | todoId    | title  |
       | $todo1.id | 買牛奶 |
+
+    # EntityValidate 指令 — 驗證資料庫記錄
+    # 以 PK 查詢後逐欄位比對，&sameTime 為 CAS 約束
     And 應該存在一個待辦事項, with table:
       | todoId    | userId    | title  | description | completed | createdAt                        |
       | $todo1.id | $Alice.id | 買牛奶 | 去全聯買    | false     | &sameTime("2026-01-27T10:00:00") |

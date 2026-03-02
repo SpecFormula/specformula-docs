@@ -5,6 +5,37 @@ description: Validate database record existence and correctness
 
 EntityValidate lets you validate database records directly in Gherkin, ensuring data is actually written rather than just relying on correct API responses.
 
+## Basic Usage
+
+```gherkin
+Then should exist a todo, with table:
+  | todoId    | userId    | title    | completed |
+  | $todo1.id | $Alice.id | Buy milk | false     |
+```
+
+This instruction will:
+1. Map "todo" to the `todos` table via Entity Spec and retrieve field definitions
+2. Query the table using `todoId` as primary key
+3. Validate each field value matches the expected value
+
+## Why Validate the Database?
+
+ResponseValidate only validates API responses, it cannot confirm whether data is actually written to the database:
+
+```gherkin
+# API response might be correct, but database might not have the data
+Then create todo(201) response, with table:
+  | todoId    | title    |
+  | $todo1.id | Buy milk |
+
+# Query database directly to ensure data persistence is correct
+And should exist a todo, with table:
+  | todoId    | title    |
+  | $todo1.id | Buy milk |
+```
+
+---
+
 ## Mapping to Entity Spec
 
 The EntityValidate instruction uses **Entity Spec** to map business entity names to actual database tables, and validates field existence against the DDL.
@@ -42,35 +73,6 @@ Then should exist a todo, with table:
 | `todo` | `entity_to_table_mapping` key |
 | `todos` table | `entity_to_table_mapping` value |
 | `todoId`, `title` fields | DDL field definitions |
-
-## Basic Usage
-
-```gherkin
-Then should exist a todo, with table:
-  | todoId    | userId    | title    | completed |
-  | $todo1.id | $Alice.id | Buy milk | false     |
-```
-
-This instruction will:
-1. Map "todo" to the `todos` table via Entity Spec and retrieve field definitions
-2. Query the table using `todoId` as primary key
-3. Validate each field value matches the expected value
-
-## Why Validate the Database?
-
-ResponseValidate only validates API responses, it cannot confirm whether data is actually written to the database:
-
-```gherkin
-# API response might be correct, but database might not have the data
-Then create todo(201) response, with table:
-  | todoId    | title    |
-  | $todo1.id | Buy milk |
-
-# Query database directly to ensure data persistence is correct
-And should exist a todo, with table:
-  | todoId    | title    |
-  | $todo1.id | Buy milk |
-```
 
 ## Lookup Strategies
 
@@ -164,17 +166,26 @@ Feature: Create Todo
 
   Background:
     Given current time is "2026-01-27T10:00:00"
+
+    # EntitySetup instruction (see EntitySetup docs)
     Given prepare a user, with table:
       | >Alice.id | name  | email             | status |
       | <userId   | Alice | alice@example.com | ACTIVE |
 
   Example: Validate todo written to database
+
+    # ApiCall instruction (see ApiCall docs)
     When (UID="$Alice.id") create todo, call table:
       | >todo1.id | title    | description    |
       | <todoId   | Buy milk | Go to Costco   |
+
+    # ResponseValidate instruction (see ResponseValidate docs)
     Then create todo(201) response, with table:
       | todoId    | title    |
       | $todo1.id | Buy milk |
+
+    # EntityValidate instruction — validate database record
+    # PK query then field-by-field comparison; &sameTime is a CAS constraint
     And should exist a todo, with table:
       | todoId    | userId    | title    | description  | completed | createdAt                        |
       | $todo1.id | $Alice.id | Buy milk | Go to Costco | false     | &sameTime("2026-01-27T10:00:00") |

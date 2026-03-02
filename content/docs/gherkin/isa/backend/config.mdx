@@ -5,6 +5,23 @@ description: isa.yml 配置結構與設定方式
 
 SpecFormula 透過 `isa.yml` 配置檔定義測試框架的運行規格，包含 API Spec、Entity Spec 和指令映射三個部分。
 
+## 專案結構
+
+`isa.yml` 放置於測試資源目錄的根層級，與 Spec 檔案和測試檔案共同組成完整的測試專案：
+
+```
+src/test/resources/
+├── isa.yml                              # ISA 設定檔
+├── specs/
+│   ├── api/
+│   │   └── api-spec.yml                 # API Spec（OpenAPI 3.0）
+│   └── data/
+│       ├── schema.sql                   # DDL 定義
+│       └── entity_to_table_mapping.yml  # Entity 對應表
+└── features/
+    └── todo.feature                     # Gherkin 測試檔
+```
+
 ## 完整範例
 
 ```yaml
@@ -53,13 +70,16 @@ instructions:
 
 ## API 配置
 
-`config.api` 設定 OpenAPI 規格檔的位置：
+`config.api` 設定 API Spec 檔案的位置：
 
 | 欄位 | 說明 | 預設值 |
 |------|------|--------|
-| `resource_path` | API Spec 在 classpath 中的路徑 | `specs/api` |
-| `project_path` | API Spec 在專案中的路徑（供 Lint 使用） | — |
+| `resource_path` | API Spec 在 classpath 中的路徑（必填） | — |
+| `project_path` | API Spec 在專案中的路徑（供 Lint 使用，必填） | — |
 | `time_format` | 時間表達式的輸出格式 | `ISO` |
+
+- `resource_path`：測試執行時的 classpath 路徑，框架用來讀取 Spec 檔案
+- `project_path`：原始碼中的檔案路徑，供 Lint 工具定位檔案並報告錯誤位置
 
 ### 時間格式
 
@@ -81,13 +101,18 @@ instructions:
 | `reuse` | 是否重用 Testcontainer 容器 | `false` |
 | `source` | 資料源列表 | — |
 
+- `permission: isolated`：各 DataSource 之間權限隔離，無法互相存取對方的資料表
+- `permission: shared`：各 DataSource 之間權限共通，可互相存取資料表
+- `reuse: true`：重用 Testcontainer 容器，避免每次測試都重新啟動，加快執行速度
+
 每個 `source` 項目的欄位：
 
-| 欄位 | 說明 |
-|------|------|
-| `name` | 資料源名稱 |
-| `resource_path` | DDL 與 mapping 檔案路徑 |
-| `db_type` | 資料庫類型：`h2`、`postgresql`、`mysql`、`mssql` |
+| 欄位 | 說明 | 預設值 |
+|------|------|--------|
+| `name` | 資料源名稱（必填） | — |
+| `resource_path` | DDL 與 mapping 檔案在 classpath 中的路徑（必填） | — |
+| `project_path` | DDL 與 mapping 檔案在專案中的路徑（供 Lint 使用，必填） | — |
+| `db_type` | 資料庫類型：`h2`、`postgresql`、`mysql`、`mssql` | `h2` |
 
 ### 資料夾結構
 
@@ -135,12 +160,20 @@ Given 準備一個使用者, with table:
 | `api_call` | [ApiCall](/docs/gherkin/isa/backend/instructions/api-call) |
 | `response_validate` | [ResponseValidate](/docs/gherkin/isa/backend/instructions/response-validate) |
 | `entity_validate` | [EntityValidate](/docs/gherkin/isa/backend/instructions/entity-validate) |
-| `entity_non_existence_validate` | [EntityValidate](/docs/gherkin/isa/backend/instructions/entity-validate)（不存在驗證） |
+| `entity_non_existence_validate` | [EntityNonExistenceValidate](/docs/gherkin/isa/backend/instructions/entity-non-existence-validate) |
 | `custom` | 使用者自訂 Step Definition |
 
-### 正則表達式擷取群組
+### 正則表達式與 Gherkin 的對應
 
-使用 `(?P<name>...)` 語法擷取 Step 中的參數：
+`format` 中的正則表達式用於匹配 Gherkin Step 文字，並透過 `(?P<name>...)` 語法擷取參數。以 `api_call` 為例：
+
+```
+Gherkin:  (UID="$Alice.id") 新增待辦事項, call table:
+正則:     ^\((?:No Actor|UID="(?P<userId>...)")\) (?P<summary>.+?), call table:$
+擷取:              userId = $Alice.id      summary = 新增待辦事項
+```
+
+### 擷取群組一覽
 
 | instruction_type | 必要群組 |
 |------------------|----------|

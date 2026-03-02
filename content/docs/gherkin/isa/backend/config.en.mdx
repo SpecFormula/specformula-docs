@@ -5,6 +5,23 @@ description: isa.yml configuration structure and settings
 
 SpecFormula uses the `isa.yml` configuration file to define the test framework's runtime specifications, including API Spec, Entity Spec, and instruction mappings.
 
+## Project Structure
+
+`isa.yml` is placed at the root of the test resources directory, alongside Spec files and test files:
+
+```
+src/test/resources/
+├── isa.yml                              # ISA configuration
+├── specs/
+│   ├── api/
+│   │   └── api-spec.yml                 # API Spec (OpenAPI 3.0)
+│   └── data/
+│       ├── schema.sql                   # DDL definition
+│       └── entity_to_table_mapping.yml  # Entity mapping
+└── features/
+    └── todo.feature                     # Gherkin test file
+```
+
 ## Complete Example
 
 ```yaml
@@ -53,13 +70,16 @@ instructions:
 
 ## API Configuration
 
-`config.api` sets the location of the OpenAPI spec file:
+`config.api` sets the location of the API Spec file:
 
 | Field | Description | Default |
 |-------|-------------|---------|
-| `resource_path` | API Spec path in classpath | `specs/api` |
-| `project_path` | API Spec path in project (for Lint) | — |
+| `resource_path` | API Spec path in classpath (required) | — |
+| `project_path` | API Spec path in project, for Lint (required) | — |
 | `time_format` | Output format for time expressions | `ISO` |
+
+- `resource_path`: The classpath used at test runtime — the framework reads Spec files from this path
+- `project_path`: The file path in source code — used by Lint tools to locate files and report error positions
 
 ### Time Formats
 
@@ -81,13 +101,18 @@ instructions:
 | `reuse` | Whether to reuse Testcontainer containers | `false` |
 | `source` | List of data sources | — |
 
+- `permission: isolated`: DataSources are permission-isolated from each other and cannot access each other's tables
+- `permission: shared`: DataSources share permissions and can access each other's tables
+- `reuse: true`: Reuse Testcontainer containers to avoid restarting for every test, speeding up execution
+
 Fields for each `source` item:
 
-| Field | Description |
-|-------|-------------|
-| `name` | Data source name |
-| `resource_path` | DDL and mapping file path |
-| `db_type` | Database type: `h2`, `postgresql`, `mysql`, `mssql` |
+| Field | Description | Default |
+|-------|-------------|---------|
+| `name` | Data source name (required) | — |
+| `resource_path` | DDL and mapping file path in classpath (required) | — |
+| `project_path` | DDL and mapping file path in project, for Lint (required) | — |
+| `db_type` | Database type: `h2`, `postgresql`, `mysql`, `mssql` | `h2` |
 
 ### Folder Structure
 
@@ -135,12 +160,20 @@ Given prepare a user, with table:
 | `api_call` | [ApiCall](/docs/gherkin/isa/backend/instructions/api-call) |
 | `response_validate` | [ResponseValidate](/docs/gherkin/isa/backend/instructions/response-validate) |
 | `entity_validate` | [EntityValidate](/docs/gherkin/isa/backend/instructions/entity-validate) |
-| `entity_non_existence_validate` | [EntityValidate](/docs/gherkin/isa/backend/instructions/entity-validate) (non-existence) |
+| `entity_non_existence_validate` | [EntityNonExistenceValidate](/docs/gherkin/isa/backend/instructions/entity-non-existence-validate) |
 | `custom` | User-defined Step Definition |
 
-### Regular Expression Capture Groups
+### Regex to Gherkin Mapping
 
-Use `(?P<name>...)` syntax to capture parameters from Steps:
+The `format` regex matches Gherkin Step text and captures parameters using `(?P<name>...)` syntax. For example, with `api_call`:
+
+```
+Gherkin:  (UID="$Alice.id") create todo, call table:
+Regex:    ^\((?:No Actor|UID="(?P<userId>...)")\) (?P<summary>.+?), call table:$
+Captured:          userId = $Alice.id    summary = create todo
+```
+
+### Capture Group Reference
 
 | instruction_type | Required Groups |
 |------------------|-----------------|

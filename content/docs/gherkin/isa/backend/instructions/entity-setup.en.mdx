@@ -5,6 +5,53 @@ description: Prepare test data with declarative syntax
 
 EntitySetup lets you declare test precondition data directly in Gherkin, without writing INSERT statements in Step Definitions.
 
+## Basic Usage
+
+```gherkin
+Given prepare a user, with table:
+  | >Alice.id | name  | email             | status |
+  | <userId   | Alice | alice@example.com | ACTIVE |
+```
+
+This instruction will:
+1. Map `user` to the `users` table via Entity Spec and retrieve column definitions
+2. Insert a record with `name = Alice`, `email = alice@example.com`, `status = ACTIVE` into the database
+3. Query back the `user_id` column value from database, store in variable `Alice.id`
+
+## Variable Extraction
+
+After INSERT, use `>` and `<` pairs to query back auto-generated column values (e.g., auto-increment ID) from the database and store them in variables for subsequent steps:
+
+- **`>variableName`** (header row): Defines the variable name to store the extracted value
+- **`<columnName`** (data row): Specifies the database column name to query back
+
+```gherkin
+Given prepare a user, with table:
+  | >Alice.id | >Alice.createdAt | name  | email             | status |
+  | <userId   | <createdAt       | Alice | alice@example.com | ACTIVE |
+```
+
+Execution flow:
+1. Write `name`, `email`, `status` to the database
+2. Query back `userId` column value from database → store in variable `Alice.id`
+3. Query back `createdAt` column value from database → store in variable `Alice.createdAt`
+
+## Variable Reference
+
+Use `$variable` to reference previously stored variables:
+
+```gherkin
+Given prepare a user, with table:
+  | >Alice.id | name  |
+  | <userId   | Alice |
+
+Given prepare a todo, with table:
+  | userId    | title    |
+  | $Alice.id | Buy milk |
+```
+
+---
+
 ## Mapping to Entity Spec
 
 The EntitySetup instruction maps business entity names to actual database tables through **Entity Spec**, and validates fields against the DDL.
@@ -86,21 +133,6 @@ Given prepare a user, with table:
   | Alice | alice@example.com |
 ```
 
----
-
-## Basic Usage
-
-```gherkin
-Given prepare a user, with table:
-  | >Alice.id | name  | email             | status |
-  | <userId   | Alice | alice@example.com | ACTIVE |
-```
-
-This instruction will:
-1. Map `user` to the `users` table via Entity Spec and retrieve column definitions
-2. Insert a record with `name = Alice`, `email = alice@example.com`, `status = ACTIVE` into the database
-3. Query back the `user_id` column value from database, store in variable `Alice.id`
-
 ## Why Not Use API to Create Precondition Data?
 
 Creating precondition data through API causes test coupling—if the "create user" API has a bug, all tests depending on that user will fail, even if the feature being tested is completely correct.
@@ -130,38 +162,6 @@ Values in DataTable are all strings. The framework auto-converts based on the co
 | `DATETIME` / `TIMESTAMP` | `@time(now)` | Current Mock time |
 | `DATE` | `@date(now)` | Current Mock date |
 
-## Variable Extraction
-
-After INSERT, use `>` and `<` pairs to query back auto-generated column values (e.g., auto-increment ID) from the database and store them in variables for subsequent steps:
-
-- **`>variableName`** (header row): Defines the variable name to store the extracted value
-- **`<columnName`** (data row): Specifies the database column name to query back
-
-```gherkin
-Given prepare a user, with table:
-  | >Alice.id | >Alice.createdAt | name  | email             | status |
-  | <userId   | <createdAt       | Alice | alice@example.com | ACTIVE |
-```
-
-Execution flow:
-1. Write `name`, `email`, `status` to the database
-2. Query back `userId` column value from database → store in variable `Alice.id`
-3. Query back `createdAt` column value from database → store in variable `Alice.createdAt`
-
-## Variable Reference
-
-Use `$variable` to reference previously stored variables:
-
-```gherkin
-Given prepare a user, with table:
-  | >Alice.id | name  |
-  | <userId   | Alice |
-
-Given prepare a todo, with table:
-  | userId    | title    |
-  | $Alice.id | Buy milk |
-```
-
 ## Error Handling
 
 ### Lint Phase
@@ -184,14 +184,21 @@ Feature: Create Todo
 
   Background:
     Given current time is "2026-01-27T10:00:00"
+
+    # EntitySetup instruction — prepare user data
+    # >Alice.id / <userId: query back userId after INSERT, store in Alice.id
     Given prepare a user, with table:
       | >Alice.id | name  | email             | passwordHash | status |
       | <userId   | Alice | alice@example.com | password123  | ACTIVE |
 
   Example: Create a todo item
+
+    # ApiCall instruction (see ApiCall docs)
     When (UID="$Alice.id") create todo, call table:
       | >todo1.id | title    |
       | <todoId   | Buy milk |
+
+    # ResponseValidate instruction (see ResponseValidate docs)
     Then create todo(201) response, with table:
       | todoId    | userId    | title    |
       | $todo1.id | $Alice.id | Buy milk |

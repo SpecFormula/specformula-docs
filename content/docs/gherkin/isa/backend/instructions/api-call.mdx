@@ -5,7 +5,49 @@ description: 以宣告式語法執行 HTTP API 請求
 
 ApiCall 讓你直接在 Gherkin 中宣告 API 呼叫的參數與回應擷取，無需撰寫 HTTP 請求的程式碼。
 
-## 與 OpenAPI Spec 的對應關係
+## 基本用法
+
+```gherkin
+When (UID="$Alice.id") 新增待辦事項, call table:
+  | >todo1.id | title  |
+  | <todoId   | 買牛奶 |
+```
+
+這段指令會：
+1. 以 `$Alice.id` 作為呼叫者身份（Bearer Token）
+2. 呼叫 API Spec 中 summary 為「新增待辦事項」的 API
+3. 將 `title: 買牛奶` 作為 Request Body
+4. 從回應中擷取 `todoId` 欄位，存入變數 `todo1.id`
+
+## 欄位語法
+
+DataTable 的欄位名稱支援特殊前綴，用於指定參數類型：
+
+| 前綴 | 用途 | 範例 |
+|------|------|------|
+| （無） | Request Body 欄位；若欄位名稱同時存在於 API Spec 的 Path/Query/Header 參數中，會自動帶入對應位置（等同同時填寫 `P:`/`Q:`/`H:`） | `title`、`todoId` |
+| `P:` | Path 參數 | `P:todoId` → 替換 URL 中的 `{todoId}` |
+| `Q:` | Query 參數 | `Q:page` → `?page=value` |
+| `H:` | HTTP Header | `H:X-Trace-Id` |
+| `>` | 存入變數 — 定義要儲存回應值的變數名稱 | `>todo1.id` |
+| `<` | 取自回應 — 指定回應 JSON 中的來源欄位 | `<todoId` |
+
+### 擷取變數配對
+
+`>` 和 `<` 必須在同一欄中上下配對：header 放變數名（`>`），row 放來源欄位（`<`）。
+
+```gherkin
+| >todo1.id | >todo1.title | title  |
+| <todoId   | <title       | 買牛奶 |
+```
+
+執行後：
+- `todo1.id` = 回應中的 `todoId` 值
+- `todo1.title` = 回應中的 `title` 值
+
+---
+
+## 與 API Spec 的對應關係
 
 ApiCall 指令透過 **summary** 欄位識別要呼叫的 API。這個設計讓測試檔案使用業務語言，而非技術性的 URL 路徑。
 
@@ -52,7 +94,7 @@ When (UID="$Alice.id") 新增待辦事項, call table:
 
 ### 對應表
 
-| Gherkin 元素 | OpenAPI Spec 來源 |
+| Gherkin 元素 | API Spec 來源 |
 |-------------|-------------------|
 | `新增待辦事項` | `paths.*.*.summary` |
 | HTTP Method | 從 path 定義推斷（`post`, `get`, `put`, `delete`） |
@@ -64,7 +106,7 @@ When (UID="$Alice.id") 新增待辦事項, call table:
 
 ### summary 唯一性要求
 
-每個 API 操作的 `summary` 在整份 OpenAPI Spec 中必須唯一：
+每個 API 操作的 `summary` 在整份 API Spec 中必須唯一：
 
 ```yaml
 # ✅ 正確：summary 各不相同
@@ -91,51 +133,9 @@ When (UID="$Alice.id") 新增待辦事項, call table:
     summary: 查詢待辦事項    # 重複！
 ```
 
----
-
-## 基本用法
-
-```gherkin
-When (UID="$Alice.id") 新增待辦事項, call table:
-  | >todo1.id | title  |
-  | <todoId   | 買牛奶 |
-```
-
-這段語法會：
-1. 以 `$Alice.id` 作為呼叫者身份（Bearer Token）
-2. 呼叫 OpenAPI Spec 中 summary 為「新增待辦事項」的 API
-3. 將 `title: 買牛奶` 作為 Request Body
-4. 從回應中擷取 `todoId` 欄位，存入變數 `todo1.id`
-
-## 欄位語法
-
-DataTable 的欄位名稱支援特殊前綴，用於指定參數類型：
-
-| 前綴 | 用途 | 範例 |
-|------|------|------|
-| （無） | Request Body 欄位 | `title` |
-| `P:` | Path 參數 | `P:todoId` → 替換 URL 中的 `{todoId}` |
-| `Q:` | Query 參數 | `Q:page` → `?page=value` |
-| `H:` | HTTP Header | `H:X-Trace-Id` |
-| `>` | 擷取變數名稱 | `>todo1.id` |
-| `<` | 回應欄位來源 | `<todoId` |
-
-### 擷取變數配對
-
-`>` 和 `<` 必須在同一欄位中配對使用：
-
-```gherkin
-| >todo1.id | >todo1.title | title  |
-| <todoId   | <title       | 買牛奶 |
-```
-
-執行後：
-- `todo1.id` = 回應中的 `todoId` 值
-- `todo1.title` = 回應中的 `title` 值
-
 ## 自動參數分類
 
-當 Body 欄位名稱與 OpenAPI Spec 中的 Path/Query/Header 參數同名時，ApiCall 會自動帶入，無需額外加前綴：
+當 Body 欄位名稱與 API Spec 中的 Path/Query/Header 參數同名時，該值會同時作為 Body 欄位送出，也會自動填入同名的參數位置，無需額外加 `P:` 或 `Q:` 前綴：
 
 ```gherkin
 # todoId 同時是 Body 和 Path 參數 → 自動帶入 P:todoId
@@ -177,6 +177,8 @@ When (No Actor) 健康檢查, call table:
   | |
 ```
 
+即使沒有參數，仍需提供空的 DataTable 以符合語法要求。
+
 ## 時間格式
 
 ApiCall 中的時間值會根據 `isa.yml` 設定的 `time_format` 自動轉換：
@@ -195,7 +197,7 @@ ApiCall 中的時間值會根據 `isa.yml` 設定的 `time_format` 自動轉換�
 
 | 錯誤 | 說明 |
 |------|------|
-| 欄位不存在 | DataTable 中的欄位名稱在 OpenAPI Spec 找不到定義 |
+| 欄位不存在 | DataTable 中的欄位名稱在 API Spec 找不到定義 |
 | 缺少必填欄位 | OpenAPI 標記為 required 的參數未提供 |
 | 擷取欄位不存在 | `<` 指定的回應欄位在 Response Schema 中找不到 |
 
@@ -203,7 +205,7 @@ ApiCall 中的時間值會根據 `isa.yml` 設定的 `time_format` 自動轉換�
 
 | 錯誤 | 說明 |
 |------|------|
-| API not found | summary 在 OpenAPI Spec 中找不到對應操作 |
+| API not found | summary 在 API Spec 中找不到對應操作 |
 | 重複的 summary | 多個操作使用相同 summary，無法唯一識別 |
 
 ## 完整範例
@@ -213,26 +215,32 @@ Feature: 待辦事項管理
 
   Background:
     Given 現在時間為 "2026-01-27T10:00:00"
+
+    # EntitySetup 指令 — 準備測試資料（參見 EntitySetup 文件）
+    # >Alice.id / <userId：擷取回應中的 userId 存入 Alice.id 變數
     Given 準備一個使用者, with table:
       | >Alice.id | name  | email             | status |
       | <userId   | Alice | alice@example.com | ACTIVE |
 
   Example: 新增並更新待辦事項
-    # 登入取得 Token
+
+    # (No Actor)：無需身份驗證的 API 呼叫
+    # >AliceToken / <token：擷取回應中的 token
     When (No Actor) 使用者登入, call table:
       | >AliceToken | email             | password    |
       | <token      | alice@example.com | password123 |
 
-    # 新增待辦事項
+    # (UID="$Alice.id")：以 Alice 身份呼叫，自動注入 Bearer Token
     When (UID="$Alice.id") 新增待辦事項, call table:
       | >todo1.id | title  |
       | <todoId   | 買牛奶 |
 
-    # 更新待辦事項（使用 Path 參數）
+    # P: 前綴表示 Path 參數；$todo1.id 引用先前擷取的變數
     When (UID="$Alice.id") 更新待辦事項, call table:
       | P:todoId  | title  |
       | $todo1.id | 買豆漿 |
 
+    # ResponseValidate 指令 — 驗證回應（參見 ResponseValidate 文件）
     Then 更新待辦事項(200)回應, with table:
       | todoId    | title  | updatedAt                        |
       | $todo1.id | 買豆漿 | &sameTime("2026-01-27T10:00:00") |
