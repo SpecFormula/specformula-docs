@@ -5,17 +5,56 @@ description: Validate database record existence and correctness
 
 EntityValidate lets you validate database records directly in Gherkin, ensuring data is actually written rather than just relying on correct API responses.
 
+## Mapping to Entity Spec
+
+The EntityValidate instruction uses **Entity Spec** to map business entity names to actual database tables, and validates field existence against the DDL.
+
+```yaml
+# entity_to_table_mapping.yml
+entity_to_table_mapping:
+  - todo: todos
+  - user: users
+```
+
+```sql
+-- schema.sql
+CREATE TABLE todos (
+    todo_id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    user_id BIGINT NOT NULL,
+    title VARCHAR(200) NOT NULL,
+    completed BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+```
+
+```gherkin
+Then should exist a todo, with table:
+  | todoId    | title    |
+  | $todo1.id | Buy milk |
+
+# SpecFormula automatically maps to the todos table
+# SELECT * FROM todos WHERE todo_id = ?
+# Validate title == "Buy milk"
+```
+
+| Gherkin Element | Mapping Source |
+|-----------------|----------------|
+| `todo` | `entity_to_table_mapping` key |
+| `todos` table | `entity_to_table_mapping` value |
+| `todoId`, `title` fields | DDL field definitions |
+
 ## Basic Usage
 
 ```gherkin
-And should exist a todo, with table:
+Then should exist a todo, with table:
   | todoId    | userId    | title    | completed |
   | $todo1.id | $Alice.id | Buy milk | false     |
 ```
 
-This syntax will:
-1. Query the `todos` table using `todoId` as primary key
-2. Validate each field value matches the expected value
+This instruction will:
+1. Map "todo" to the `todos` table via Entity Spec and retrieve field definitions
+2. Query the table using `todoId` as primary key
+3. Validate each field value matches the expected value
 
 ## Why Validate the Database?
 
@@ -39,38 +78,38 @@ EntityValidate supports three query approaches:
 
 ### 1. PK Query (Priority)
 
-Provide the complete primary key:
+Provide the complete primary key to query a single record directly:
 
 ```gherkin
 | todoId    | title    |
 | $todo1.id | Buy milk |
+
+# SELECT * FROM todos WHERE todo_id = ?
+# Validate title == "Buy milk"
 ```
 
 ### 2. Probe Query
 
-When PK is missing, use provided fields as query conditions:
+When PK is missing, use provided field combinations as query conditions:
 
 ```gherkin
 | userId    | status | title    |
 | $Alice.id | ACTIVE | Buy milk |
+
+# SELECT * FROM todos WHERE user_id = ? AND status = ? AND title = ?
+# Expects exactly one result
 ```
 
 ### 3. CAS Post-Filtering
 
-When Probe returns multiple results, use CAS constraints to filter:
+When Probe returns multiple results, use CAS constraints to filter for a unique record:
 
 ```gherkin
 | userId    | status | createdAt                        |
 | $Alice.id | ACTIVE | &sameTime("2026-01-27T10:00:00") |
-```
 
-## Field Name Conversion
-
-DataTable uses camelCase, the framework automatically maps to database snake_case:
-
-```
-DataTable: totalAmount → DB: total_amount
-DataTable: orderDate   → DB: order_date
+# SELECT * FROM todos WHERE user_id = ? AND status = ?
+# Filter results by created_at ≈ "2026-01-27T10:00:00"
 ```
 
 ## Type Conversion
@@ -84,13 +123,22 @@ The framework automatically performs semantic comparison:
 
 ## CAS Constraints
 
-CAS constraints can be used during validation:
+CAS constraints can be used for flexible validation:
 
 ```gherkin
-And should exist a product, with table:
+Then should exist a product, with table:
   | id | name  | price      | stock      | deletedAt |
   | 1  | Phone | &gt(10000) | &lte(1000) | &isNull   |
 ```
+
+Common constraints:
+- `&isNum`, `&isStr`, `&isNull` — Type checks
+- `&gt()`, `&lt()`, `&gte()`, `&lte()`, `&between()` — Numeric ranges
+- `&contains()`, `&startsWith()` — String matching
+- `&sameTime()` — Time comparison
+- `&oneOf()` — Enum matching
+
+For the complete list, see [CAS Symbols](/docs/gherkin/isa/backend/symbols/cas).
 
 ## Error Handling
 

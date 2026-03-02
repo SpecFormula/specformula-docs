@@ -3,19 +3,58 @@ title: EntityValidate
 description: 驗證資料庫記錄的存在性與正確性
 ---
 
-EntityValidate 讓你直接在 Gherkin 中驗證資料庫記錄，確保資料真正寫入而非只是 API 回傳正確。
+EntityValidate 讓你直接在 Gherkin 中驗證資料庫狀態，確保資料真正寫入或更新而非只是 API 回傳正確。
+
+## 與 Entity Spec 的對應關係
+
+EntityValidate 指令透過 **Entity Spec** 將業務實體名稱對應到實際的資料表，並根據 DDL 驗證欄位是否存在。
+
+```yaml
+# entity_to_table_mapping.yml
+entity_to_table_mapping:
+  - 使用者: users
+  - 待辦事項: todos
+```
+
+```sql
+-- schema.sql
+CREATE TABLE todos (
+    todo_id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    user_id BIGINT NOT NULL,
+    title VARCHAR(200) NOT NULL,
+    completed BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+```
+
+```gherkin
+Then 應該存在一個待辦事項, with table:
+  | todoId    | title  |
+  | $todo1.id | 買牛奶 |
+
+# SpecFormula 自動對應到 todos 資料表
+# SELECT * FROM todos WHERE todo_id = ?
+# 驗證 title == "買牛奶"
+```
+
+| Gherkin 元素 | 對應來源 |
+|-------------|----------|
+| `待辦事項` | `entity_to_table_mapping` 的 key |
+| `todos` 資料表 | `entity_to_table_mapping` 的 value |
+| `todoId`, `title` 欄位 | DDL 欄位定義 |
 
 ## 基本用法
 
 ```gherkin
-And 應該存在一個待辦事項, with table:
+Then 應該存在一個待辦事項, with table:
   | todoId    | userId    | title  | completed |
   | $todo1.id | $Alice.id | 買牛奶 | false     |
 ```
 
-這段語法會：
-1. 以 `todoId` 作為主鍵查詢 `todos` 資料表
-2. 逐欄位驗證實際值是否符合預期
+這段指令會：
+1. 透過 Entity Spec 將「待辦事項」對應到 `todos` 資料表，並取得欄位定義
+2. 以 `todoId` 作為主鍵查詢資料表
+3. 逐欄位驗證實際值是否符合預期
 
 ## 為什麼需要驗證資料庫？
 
@@ -39,38 +78,38 @@ EntityValidate 支援三種查詢方式：
 
 ### 1. PK 查詢（優先）
 
-提供完整主鍵：
+提供完整主鍵，直接以 PK 查詢單筆記錄：
 
 ```gherkin
 | todoId    | title  |
 | $todo1.id | 買牛奶 |
+
+# SELECT * FROM todos WHERE todo_id = ?
+# 驗證 title == "買牛奶"
 ```
 
 ### 2. Probe 查詢
 
-缺少 PK 時，使用提供的欄位作為查詢條件：
+缺少 PK 時，使用提供的欄位組合作為查詢條件：
 
 ```gherkin
 | userId    | status | title  |
 | $Alice.id | ACTIVE | 買牛奶 |
+
+# SELECT * FROM todos WHERE user_id = ? AND status = ? AND title = ?
+# 預期回傳恰好一筆
 ```
 
 ### 3. CAS 後過濾
 
-Probe 回傳多筆結果時，用 CAS 約束篩選：
+Probe 回傳多筆結果時，用 CAS 約束在結果集中篩選唯一記錄：
 
 ```gherkin
-| userId    | status | createdAt                       |
+| userId    | status | createdAt                        |
 | $Alice.id | ACTIVE | &sameTime("2026-01-27T10:00:00") |
-```
 
-## 欄位名稱轉換
-
-DataTable 使用 camelCase，框架自動對應資料庫的 snake_case：
-
-```
-DataTable: totalAmount → DB: total_amount
-DataTable: orderDate   → DB: order_date
+# SELECT * FROM todos WHERE user_id = ? AND status = ?
+# 對結果集逐筆比對 created_at ≈ "2026-01-27T10:00:00"
 ```
 
 ## 型別轉換
@@ -84,13 +123,22 @@ DataTable: orderDate   → DB: order_date
 
 ## CAS 約束
 
-驗證時可使用 CAS 約束：
+驗證時可使用 CAS 約束進行彈性驗證：
 
 ```gherkin
-And 應該存在一個商品, with table:
+Then 應該存在一個商品, with table:
   | id | name | price      | stock      | deletedAt |
   | 1  | 手機 | &gt(10000) | &lte(1000) | &isNull   |
 ```
+
+常用約束：
+- `&isNum`、`&isStr`、`&isNull` — 型別檢查
+- `&gt()`、`&lt()`、`&gte()`、`&lte()`、`&between()` — 數值範圍
+- `&contains()`、`&startsWith()` — 字串匹配
+- `&sameTime()` — 時間比對
+- `&oneOf()` — 列舉匹配
+
+完整約束清單請參考 [CAS 符號](/docs/gherkin/isa/backend/symbols/cas)。
 
 ## 錯誤處理
 

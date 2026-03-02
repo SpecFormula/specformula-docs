@@ -5,17 +5,56 @@ description: Validate database record non-existence
 
 EntityNonExistenceValidate lets you verify that a record has been deleted from the database, commonly used for testing delete operations.
 
+## Mapping to Entity Spec
+
+The EntityNonExistenceValidate instruction uses **Entity Spec** to map business entity names to actual database tables, and validates field existence against the DDL.
+
+```yaml
+# entity_to_table_mapping.yml
+entity_to_table_mapping:
+  - todo: todos
+  - user: users
+```
+
+```sql
+-- schema.sql
+CREATE TABLE todos (
+    todo_id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    user_id BIGINT NOT NULL,
+    title VARCHAR(200) NOT NULL,
+    completed BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+```
+
+```gherkin
+Then should not exist a todo, with table:
+  | todoId    |
+  | $todo1.id |
+
+# SpecFormula automatically maps to the todos table
+# SELECT * FROM todos WHERE todo_id = ?
+# Validate query result is empty
+```
+
+| Gherkin Element | Mapping Source |
+|-----------------|----------------|
+| `todo` | `entity_to_table_mapping` key |
+| `todos` table | `entity_to_table_mapping` value |
+| `todoId` field | DDL field definitions |
+
 ## Basic Usage
 
 ```gherkin
-And should not exist a todo, with table:
+Then should not exist a todo, with table:
   | todoId    | userId    |
   | $todo1.id | $Alice.id |
 ```
 
-This syntax will:
-1. Use the provided fields as query conditions
-2. Validate the query result is empty (record does not exist)
+This instruction will:
+1. Map "todo" to the `todos` table via Entity Spec and retrieve field definitions
+2. Use the provided fields as query conditions
+3. Validate the query result is empty (record does not exist)
 
 ## Use Case
 
@@ -28,7 +67,7 @@ When (UID="$Alice.id") delete todo, call table:
 Then delete todo(200) response, with table:
   | message          |
   | Delete succeeded |
-And should not exist a todo, with table:
+Then should not exist a todo, with table:
   | todoId    |
   | $todo1.id |
 ```
@@ -37,29 +76,26 @@ And should not exist a todo, with table:
 
 ### PK Query (Priority)
 
-Provide the complete primary key:
+Provide the complete primary key to query directly:
 
 ```gherkin
 | todoId    |
 | $todo1.id |
+
+# SELECT * FROM todos WHERE todo_id = ?
+# Validate query result is empty
 ```
 
 ### Probe Query
 
-Use non-PK fields as query conditions:
+Use non-PK field combinations as query conditions:
 
 ```gherkin
 | userId    | title    |
 | $Alice.id | Buy milk |
-```
 
-## Field Name Conversion
-
-DataTable uses camelCase, the framework automatically maps to database snake_case:
-
-```
-DataTable: orderId   → DB: order_id
-DataTable: productId → DB: product_id
+# SELECT * FROM todos WHERE user_id = ? AND title = ?
+# Validate query result is empty
 ```
 
 ## Limitations
