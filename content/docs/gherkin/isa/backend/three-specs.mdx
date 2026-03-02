@@ -15,44 +15,34 @@ SpecFormula 的後端測試框架建立在三份核心規格文件之上，我�
 
 ```mermaid
 flowchart TB
-    subgraph Feature[".feature 測試檔案"]
+    subgraph Feature["Feature File"]
         F1["Given 準備一個特務, with table: ..."]
         F2["When (UID=$Agent.id) 打卡, call table: ..."]
         F3["Then 應該存在一個打卡記錄, with table: ..."]
     end
 
-    subgraph Specs[" "]
-        subgraph API["API Spec"]
-            API1["summary: 打卡"]
-            API2["POST /punch"]
-            API3["request/response"]
-        end
-        subgraph EM["Entity Spec"]
-            EM1["特務 → agents"]
-            EM2["打卡記錄 → punch_records"]
-            DDL["DDL → agents punch_records 資料表結構"]
-        end
+    subgraph API["API Spec"]
+        API1["summary: 打卡"]
+        API2["POST /punch"]
+        API3["request/response"]
     end
 
-    subgraph ISA["ISA Config（配置檔）"]
-        ISA1["指令語法定義"]
-        ISA2["API 配置"]
-        ISA3["資料來源配置"]
+    subgraph EM["Entity Spec"]
+        EM1["特務 → agents"]
+        EM2["打卡記錄 → punch_records"]
+        DDL["DDL → agents punch_records 資料表結構"]
     end
 
     subgraph Engine["SpecFormula 引擎"]
-        E1["解析指令語法 → 識別指令類型"]
+        E1["查詢 API Spec → 建構 HTTP 請求"]
         E2["查詢 Entity Spec → 取得資料表結構"]
-        E3["查詢 API Spec → 建構 HTTP 請求"]
-        E4["執行操作並驗證結果"]
+        E3["執行操作並驗證結果"]
     end
 
-    Feature --> EM
     Feature --> API
-    Feature --> ISA
-    EM --> Engine
+    Feature --> EM
     API --> Engine
-    ISA --> Engine
+    EM --> Engine
 ```
 
 ## 為什麼要三份規格一起維護？
@@ -226,7 +216,7 @@ When (UID="$Agent.id") 打卡, call table:
 ```gherkin
 Then 打卡(200)回應, with table:
   | recordId | agentId | punchType |
-  | @notnull | 1       | IN        |
+  | &isNotNull | 1       | IN        |
 ```
 
 | Gherkin 元素 | 對應 API Spec |
@@ -336,13 +326,13 @@ src/test/resources/isa.yml
 ```yaml
 config:
   api:
-    resource_path: specs/api              # API Spec 相對路徑
-    project_path: src/test/resources/specs/api
+    resource_path: specs/api                          # classpath 路徑，框架讀取用
+    project_path: src/test/resources/specs/api        # 原始碼路徑，Lint 報錯用
   data:
     source:
       - name: primary
-        resource_path: specs/data/primary
-        project_path: src/test/resources/specs/data/primary
+        resource_path: specs/data/primary             # classpath 路徑，框架讀取用
+        project_path: src/test/resources/specs/data/primary  # 原始碼路徑，Lint 報錯用
         db_type: mssql
 
 instructions:
@@ -456,8 +446,8 @@ entity_to_table_mapping:
 
 Lint 會檢查：
 - API Spec 中的 summary 是否唯一
-- Entity Spec 中的資料表是否存在於 DDL
-- .feature 中使用的欄位是否在 Entity Spec 與 API Spec 中定義
+- Entity Spec 中 `entity_to_table_mapping` 的資料表是否存在於 DDL
+- Feature File 中使用的欄位是否在 Entity Spec 與 API Spec 中定義
 
 ### 4. CI 自動化測試
 

@@ -15,44 +15,34 @@ SpecFormula's backend testing framework is built on three core specifications, w
 
 ```mermaid
 flowchart TB
-    subgraph Feature[".feature Test Files"]
+    subgraph Feature["Feature File"]
         F1["Given prepare an agent, with table: ..."]
         F2["When (UID=$Agent.id) punch, call table: ..."]
         F3["Then should exist a punch record, with table: ..."]
     end
 
-    subgraph Specs[" "]
-        subgraph API["API Spec"]
-            API1["summary: punch"]
-            API2["POST /punch"]
-            API3["request/response"]
-        end
-        subgraph EM["Entity Spec"]
-            EM1["agent → agents"]
-            EM2["punch record → punch_records"]
-            DDL["DDL → agents punch_records table structure"]
-        end
+    subgraph API["API Spec"]
+        API1["summary: punch"]
+        API2["POST /punch"]
+        API3["request/response"]
     end
 
-    subgraph ISA["ISA Config (Configuration)"]
-        ISA1["Instruction syntax definition"]
-        ISA2["API configuration"]
-        ISA3["Data source configuration"]
+    subgraph EM["Entity Spec"]
+        EM1["agent → agents"]
+        EM2["punch record → punch_records"]
+        DDL["DDL → agents punch_records table structure"]
     end
 
     subgraph Engine["SpecFormula Engine"]
-        E1["Parse instruction syntax → Identify instruction type"]
+        E1["Query API Spec → Build HTTP request"]
         E2["Query Entity Spec → Get table structure"]
-        E3["Query API Spec → Build HTTP request"]
-        E4["Execute operation and verify result"]
+        E3["Execute operation and verify result"]
     end
 
-    Feature --> EM
     Feature --> API
-    Feature --> ISA
-    EM --> Engine
+    Feature --> EM
     API --> Engine
-    ISA --> Engine
+    EM --> Engine
 ```
 
 ## Why Maintain Three Specs Together?
@@ -226,7 +216,7 @@ When (UID="$Agent.id") punch, call table:
 ```gherkin
 Then punch(200) response, with table:
   | recordId | agentId | punchType |
-  | @notnull | 1       | IN        |
+  | &isNotNull | 1       | IN        |
 ```
 
 | Gherkin Element | API Spec Mapping |
@@ -336,13 +326,13 @@ src/test/resources/isa.yml
 ```yaml
 config:
   api:
-    resource_path: specs/api              # API Spec relative path
-    project_path: src/test/resources/specs/api
+    resource_path: specs/api                          # classpath, used by framework at runtime
+    project_path: src/test/resources/specs/api        # source path, used by Lint for error reporting
   data:
     source:
       - name: primary
-        resource_path: specs/data/primary
-        project_path: src/test/resources/specs/data/primary
+        resource_path: specs/data/primary             # classpath, used by framework at runtime
+        project_path: src/test/resources/specs/data/primary  # source path, used by Lint for error reporting
         db_type: mssql
 
 instructions:
@@ -456,8 +446,8 @@ entity_to_table_mapping:
 
 Lint checks:
 - Whether summaries in API Spec are unique
-- Whether tables in Entity Spec exist in DDL
-- Whether fields used in .feature are defined in Entity Spec and API Spec
+- Whether tables in Entity Spec `entity_to_table_mapping` exist in DDL
+- Whether fields used in Feature File are defined in Entity Spec and API Spec
 
 ### 4. CI Automated Testing
 
