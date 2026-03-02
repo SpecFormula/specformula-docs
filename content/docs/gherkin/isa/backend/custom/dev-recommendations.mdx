@@ -1,0 +1,283 @@
+---
+title: 開發建議
+description: Custom Step Definition 實作教學與 SpecFormula 開發介面參考
+---
+
+本頁說明如何撰寫 Cucumber Step Definition 來實作自訂指令，以及如何在 Step Definition 中使用 SpecFormula 提供的開發介面。
+
+## 前置條件
+
+專案需引入 `specformula-spring` 依賴，該模組會自動透過 `SpecFormulaSpringConfiguration` 註冊所有開發介面為 Spring Bean，可直接 `@Autowired` 注入。
+
+## Step Definition 基本結構
+
+以[總覽頁](/docs/gherkin/isa/backend/custom)的「管理員」為例，對應的 Step Definition：
+
+```java
+import ai.specformula.core.context.ScenarioContextAccessor;
+import io.cucumber.java.zh_tw.Given;
+import org.springframework.beans.factory.annotation.Autowired;
+
+public class AdminSetupSteps {
+
+    @Autowired
+    private ScenarioContextAccessor context;
+
+    @Given("\"{alias}\" 是一個管理員, with table:")
+    public void adminSetup(String alias, io.cucumber.datatable.DataTable dataTable) {
+        // 從 DataTable 取得參數
+        Map<String, String> row = dataTable.asMaps().get(0);
+        String role = row.get("role");
+
+        // 執行業務邏輯
+        Admin admin = adminService.create(role);
+
+        // 存入 context，key 須與 isa.yml export_vars 宣告一致
+        context.putObject(alias + ".id", admin.getId());
+        context.putObject(alias + ".account", admin.getAccount());
+    }
+}
+```
+
+重點：
+
+- `@Given` 的 pattern 須與 `isa.yml` 的 `format` 匹配相同的 step 文字
+- `context.putObject()` 的 key **必須**與 `export_vars` 宣告的 pattern 一致，後續步驟才能透過 `$SAM.id` 引用
+
+---
+
+## ScenarioContextAccessor
+
+存取 Scenario 生命週期內的變數，是自訂指令與 SpecFormula 符號系統互通的橋樑。
+
+```java
+@Autowired
+private ScenarioContextAccessor context;
+```
+
+### 寫入變數
+
+```java
+context.putObject("SAM.id", 1L);
+context.putObject("SAM.account", "sam");
+```
+
+寫入後，後續步驟中的 `$SAM.id` 和 `$SAM.account` 即可解析。
+
+### 讀取變數
+
+```java
+Object value = context.get("SAM.id");  // → 1L
+```
+
+用於在自訂指令中引用其他步驟導出的變數。
+
+### 與 export_vars 的對應關係
+
+`isa.yml` 中的 `export_vars` 是**給 Linter 看的靜態宣告**，`context.putObject()` 是**給執行期用的實際寫入**。兩者的 key 必須一致：
+
+| isa.yml export_vars key | Step Definition putObject key |
+|-------------------------|-------------------------------|
+| `"{{alias}}.id"` | `alias + ".id"` |
+| `"{{alias}}.account"` | `alias + ".account"` |
+
+若不一致，Linter 驗證通過但執行期找不到變數，或反過來——執行期存入了 Linter 不知道的變數。
+
+---
+
+## FeatureArgumentResolver
+
+整合三個符號系統的解析器，讓自訂指令能使用與內建指令相同的表達式語法。
+
+```java
+@Autowired
+private FeatureArgumentResolver resolver;
+```
+
+### resolveVariable — 解析變數與表達式
+
+將字串中的符號解析為實際值：
+
+```java
+// $var 引用
+Object id = resolver.resolveVariable("$SAM.id");        // → 1L
+
+// 字串插值
+Object msg = resolver.resolveVariable("Hello ${SAM.account}");  // → "Hello sam"
+
+// 時間表達式
+Object time = resolver.resolveVariable("@time(\"now-1d\")");    // → ZonedDateTime
+Object date = resolver.resolveVariable("@date(\"2025-12-25\")"); // → LocalDate
+```
+
+### resolveAndValidate — 解析並驗證
+
+解析期望值並與實際值比對，整合了變數解析與約束斷言：
+
+```java
+// 約束斷言：通過時回傳 null，失敗時拋出 AssertionError
+resolver.resolveAndValidate("&gt(0)&lt(100)", actualValue, "score", "TestEntity");
+
+// 變數解析 + 比對
+Object resolved = resolver.resolveAndValidate("$SAM.id", actualValue, "userId", "TestEntity");
+// resolved 為 null 表示內部已驗證通過；非 null 表示需要呼叫端自行比對
+```
+
+### valuesEqual — 型別感知比對
+
+處理 JDBC 型別轉換、BigDecimal scale 差異、時間精度等邊界情況：
+
+```java
+boolean eq = resolver.valuesEqual("$SAM.id", actualDbValue);
+```
+
+---
+
+## 內建指令介面
+
+SpecFormula 將內建指令的核心能力以 Spring Bean 介面開放，讓自訂指令能組合使用。
+
+### TimeControlInstruction
+
+設定測試情境的當前時間：
+
+```java
+@Autowired
+private TimeControlInstruction timeControl;
+
+// 支援 ISO 8601、相對時間、@time() 表達式
+timeControl.setTime("2025-12-25T10:00:00+08:00");
+timeControl.setTime("now-1d");
+```
+
+### EntitySetupInstruction
+
+插入測試資料：
+
+```java
+@Autowired
+private EntitySetupInstruction entitySetup;
+
+entitySetup.setup("使用者", List.of(
+    Map.of("name", "Alice", "email", "alice@example.com")
+));
+```
+
+### EntityValidateInstruction
+
+驗證資料庫中存在符合條件的記錄：
+
+```java
+@Autowired
+private EntityValidateInstruction entityValidate;
+
+entityValidate.assertExists("使用者", List.of(
+    Map.of("name", "Alice", "email", "alice@example.com")
+));
+```
+
+### EntityNonExistenceValidateInstruction
+
+驗證資料庫中不存在符合條件的記錄：
+
+```java
+@Autowired
+private EntityNonExistenceValidateInstruction entityNonExistenceValidate;
+
+entityNonExistenceValidate.assertNotExists("使用者", List.of(
+    Map.of("name", "Alice")
+));
+```
+
+### ApiCallInstruction
+
+執行 HTTP API 請求：
+
+```java
+@Autowired
+private ApiCallInstruction apiCall;
+
+// 帶身份驗證
+apiCall.invokeWithActor("建立待辦事項", token, List.of(
+    Map.of("title", "Buy milk")
+));
+
+// 無身份驗證
+apiCall.invokeWithoutActor("取得公開資訊", List.of(
+    Map.of("category", "news")
+));
+```
+
+### ResponseValidateInstruction
+
+驗證 API 回應：
+
+```java
+@Autowired
+private ResponseValidateInstruction responseValidate;
+
+// 驗證狀態碼與欄位值
+responseValidate.validate("建立待辦事項", "201", List.of(
+    Map.of("title", "Buy milk")
+));
+
+// 僅驗證狀態碼
+responseValidate.validate("建立待辦事項", "201", null);
+```
+
+---
+
+## 完整範例
+
+結合以上介面，實作一個「管理員」自訂指令，內部使用 EntitySetup 插入資料並導出變數：
+
+```java
+import ai.specformula.core.context.ScenarioContextAccessor;
+import ai.specformula.spring.instruction.EntitySetupInstruction;
+import io.cucumber.java.zh_tw.Given;
+import org.springframework.beans.factory.annotation.Autowired;
+
+public class AdminSetupSteps {
+
+    @Autowired
+    private ScenarioContextAccessor context;
+
+    @Autowired
+    private EntitySetupInstruction entitySetup;
+
+    @Given("\"{alias}\" 是一個管理員, with table:")
+    public void adminSetup(String alias, io.cucumber.datatable.DataTable dataTable) {
+        Map<String, String> row = dataTable.asMaps().get(0);
+
+        // 使用 EntitySetup 插入使用者資料
+        entitySetup.setup("使用者", List.of(
+            Map.of(
+                "name", alias,
+                "role", row.get("role"),
+                "department", row.getOrDefault("department", "")
+            )
+        ));
+
+        // 查詢建立的資料並導出變數
+        Long adminId = queryAdminId(alias);
+        context.putObject(alias + ".id", adminId);
+        context.putObject(alias + ".account", alias.toLowerCase());
+    }
+}
+```
+
+對應的 Gherkin 用法：
+
+```gherkin
+Given "SAM" 是一個管理員, with table:
+  | role        | department |
+  | SUPER_ADMIN | 營運部     |
+
+# 此步驟執行後：
+#   $SAM.id      → 管理員 ID (Number)
+#   $SAM.account → "sam" (String)
+
+When (UID="$SAM.id") 建立待辦事項, call table:
+  | title    |
+  | Buy milk |
+```

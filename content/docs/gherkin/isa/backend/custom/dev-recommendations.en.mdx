@@ -1,0 +1,283 @@
+---
+title: Development Recommendations
+description: Custom Step Definition implementation guide and SpecFormula development API reference
+---
+
+This page explains how to write Cucumber Step Definitions to implement custom instructions, and how to use the development APIs provided by SpecFormula within Step Definitions.
+
+## Prerequisites
+
+Your project needs the `specformula-spring` dependency. This module automatically registers all development APIs as Spring Beans via `SpecFormulaSpringConfiguration`, available for direct `@Autowired` injection.
+
+## Step Definition Basic Structure
+
+Using the "Admin" example from the [overview page](/docs/gherkin/isa/backend/custom), here's the corresponding Step Definition:
+
+```java
+import ai.specformula.core.context.ScenarioContextAccessor;
+import io.cucumber.java.en.Given;
+import org.springframework.beans.factory.annotation.Autowired;
+
+public class AdminSetupSteps {
+
+    @Autowired
+    private ScenarioContextAccessor context;
+
+    @Given("\"{alias}\" is an admin, with table:")
+    public void adminSetup(String alias, io.cucumber.datatable.DataTable dataTable) {
+        // Get parameters from DataTable
+        Map<String, String> row = dataTable.asMaps().get(0);
+        String role = row.get("role");
+
+        // Execute business logic
+        Admin admin = adminService.create(role);
+
+        // Store in context, key must match isa.yml export_vars declaration
+        context.putObject(alias + ".id", admin.getId());
+        context.putObject(alias + ".account", admin.getAccount());
+    }
+}
+```
+
+Key points:
+
+- The `@Given` pattern must match the same step text as the `format` in `isa.yml`
+- The `context.putObject()` key **must** match the `export_vars` declared pattern, so subsequent steps can reference via `$SAM.id`
+
+---
+
+## ScenarioContextAccessor
+
+Accesses variables within the Scenario lifecycle — the bridge between custom instructions and SpecFormula's symbol system.
+
+```java
+@Autowired
+private ScenarioContextAccessor context;
+```
+
+### Writing Variables
+
+```java
+context.putObject("SAM.id", 1L);
+context.putObject("SAM.account", "sam");
+```
+
+After writing, `$SAM.id` and `$SAM.account` become resolvable in subsequent steps.
+
+### Reading Variables
+
+```java
+Object value = context.get("SAM.id");  // → 1L
+```
+
+Used to reference variables exported by other steps within a custom instruction.
+
+### Relationship with export_vars
+
+`export_vars` in `isa.yml` is a **static declaration for the Linter**, while `context.putObject()` is the **actual runtime write**. Their keys must match:
+
+| isa.yml export_vars key | Step Definition putObject key |
+|-------------------------|-------------------------------|
+| `"{{alias}}.id"` | `alias + ".id"` |
+| `"{{alias}}.account"` | `alias + ".account"` |
+
+If they don't match, the Linter passes validation but runtime can't find the variable, or vice versa — runtime stores a variable the Linter doesn't know about.
+
+---
+
+## FeatureArgumentResolver
+
+A resolver integrating three symbol systems, enabling custom instructions to use the same expression syntax as built-in instructions.
+
+```java
+@Autowired
+private FeatureArgumentResolver resolver;
+```
+
+### resolveVariable — Resolve Variables and Expressions
+
+Resolves symbols in strings to actual values:
+
+```java
+// $var reference
+Object id = resolver.resolveVariable("$SAM.id");        // → 1L
+
+// String interpolation
+Object msg = resolver.resolveVariable("Hello ${SAM.account}");  // → "Hello sam"
+
+// Time expressions
+Object time = resolver.resolveVariable("@time(\"now-1d\")");    // → ZonedDateTime
+Object date = resolver.resolveVariable("@date(\"2025-12-25\")"); // → LocalDate
+```
+
+### resolveAndValidate — Resolve and Validate
+
+Resolves expected values and compares with actual values, integrating variable resolution and constraint assertions:
+
+```java
+// Constraint assertion: returns null on pass, throws AssertionError on failure
+resolver.resolveAndValidate("&gt(0)&lt(100)", actualValue, "score", "TestEntity");
+
+// Variable resolution + comparison
+Object resolved = resolver.resolveAndValidate("$SAM.id", actualValue, "userId", "TestEntity");
+// resolved is null means internal validation passed; non-null means caller should compare
+```
+
+### valuesEqual — Type-Aware Comparison
+
+Handles JDBC type conversions, BigDecimal scale differences, time precision, and other edge cases:
+
+```java
+boolean eq = resolver.valuesEqual("$SAM.id", actualDbValue);
+```
+
+---
+
+## Built-in Instruction APIs
+
+SpecFormula exposes built-in instruction capabilities as Spring Bean interfaces, enabling custom instructions to compose with them.
+
+### TimeControlInstruction
+
+Set the current time for the test scenario:
+
+```java
+@Autowired
+private TimeControlInstruction timeControl;
+
+// Supports ISO 8601, relative time, @time() expressions
+timeControl.setTime("2025-12-25T10:00:00+08:00");
+timeControl.setTime("now-1d");
+```
+
+### EntitySetupInstruction
+
+Insert test data:
+
+```java
+@Autowired
+private EntitySetupInstruction entitySetup;
+
+entitySetup.setup("User", List.of(
+    Map.of("name", "Alice", "email", "alice@example.com")
+));
+```
+
+### EntityValidateInstruction
+
+Assert that matching records exist in the database:
+
+```java
+@Autowired
+private EntityValidateInstruction entityValidate;
+
+entityValidate.assertExists("User", List.of(
+    Map.of("name", "Alice", "email", "alice@example.com")
+));
+```
+
+### EntityNonExistenceValidateInstruction
+
+Assert that no matching records exist in the database:
+
+```java
+@Autowired
+private EntityNonExistenceValidateInstruction entityNonExistenceValidate;
+
+entityNonExistenceValidate.assertNotExists("User", List.of(
+    Map.of("name", "Alice")
+));
+```
+
+### ApiCallInstruction
+
+Execute HTTP API requests:
+
+```java
+@Autowired
+private ApiCallInstruction apiCall;
+
+// With authentication
+apiCall.invokeWithActor("Create todo", token, List.of(
+    Map.of("title", "Buy milk")
+));
+
+// Without authentication
+apiCall.invokeWithoutActor("Get public info", List.of(
+    Map.of("category", "news")
+));
+```
+
+### ResponseValidateInstruction
+
+Validate API responses:
+
+```java
+@Autowired
+private ResponseValidateInstruction responseValidate;
+
+// Validate status code and field values
+responseValidate.validate("Create todo", "201", List.of(
+    Map.of("title", "Buy milk")
+));
+
+// Validate status code only
+responseValidate.validate("Create todo", "201", null);
+```
+
+---
+
+## Complete Example
+
+Combining the above APIs, implementing an "Admin" custom instruction that uses EntitySetup internally to insert data and export variables:
+
+```java
+import ai.specformula.core.context.ScenarioContextAccessor;
+import ai.specformula.spring.instruction.EntitySetupInstruction;
+import io.cucumber.java.en.Given;
+import org.springframework.beans.factory.annotation.Autowired;
+
+public class AdminSetupSteps {
+
+    @Autowired
+    private ScenarioContextAccessor context;
+
+    @Autowired
+    private EntitySetupInstruction entitySetup;
+
+    @Given("\"{alias}\" is an admin, with table:")
+    public void adminSetup(String alias, io.cucumber.datatable.DataTable dataTable) {
+        Map<String, String> row = dataTable.asMaps().get(0);
+
+        // Use EntitySetup to insert user data
+        entitySetup.setup("User", List.of(
+            Map.of(
+                "name", alias,
+                "role", row.get("role"),
+                "department", row.getOrDefault("department", "")
+            )
+        ));
+
+        // Query created data and export variables
+        Long adminId = queryAdminId(alias);
+        context.putObject(alias + ".id", adminId);
+        context.putObject(alias + ".account", alias.toLowerCase());
+    }
+}
+```
+
+Corresponding Gherkin usage:
+
+```gherkin
+Given "SAM" is an admin, with table:
+  | role        | department |
+  | SUPER_ADMIN | Operations |
+
+# After this step executes:
+#   $SAM.id      → Admin ID (Number)
+#   $SAM.account → "sam" (String)
+
+When (UID="$SAM.id") Create todo, call table:
+  | title    |
+  | Buy milk |
+```

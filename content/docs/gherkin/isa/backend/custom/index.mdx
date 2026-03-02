@@ -1,0 +1,86 @@
+---
+title: 自訂指令
+description: 透過 Cucumber Step Definition 擴充 SpecFormula，搭配 isa.yml 契約讓 Linter 驗證語法
+---
+
+SpecFormula 內建五種指令（`time_control`、`entity_setup`、`api_call`、`response_validate`、`entity_validate`），涵蓋最常見的測試操作。當專案需要超出內建範圍的功能時，開發者可以撰寫自訂指令來擴充。
+
+## 什麼是自訂指令
+
+自訂指令由兩個部分組成：
+
+| 部分 | 做什麼 | 目的 |
+|------|--------|------|
+| **Cucumber Step Definition** | 開發者撰寫 Java 程式碼，實作指令的執行邏輯 | 讓指令能實際運行 |
+| **isa.yml 配置** | 在 `isa.yml` 登記 `instruction_type: custom`，宣告格式與契約 | 讓 Linter 能驗證 feature file 語法 |
+
+這也是自訂指令與內建指令的核心差異——內建指令的 Step Definition 由 SpecFormula 提供，自訂指令的 Step Definition 由開發者自己撰寫。
+
+## 適用場景
+
+- **DSL 層級的語意封裝**：將多步驟的資料準備封裝為一條指令，例如「使用者 "SAM" 是一個管理員」背後同時建立帳號、設定角色、寫入預設值。
+- **第三方服務整合**：Mock 外部 API、存取 Redis、上傳檔案等內建指令未支援的操作。
+- **重複的多步驟樣板**：多個 feature file 反覆使用相同的 EntitySetup 組合時，封裝為一條指令讓 Gherkin 只表達差異點。
+
+不適合的場景：僅出現一次的步驟、兩三條 EntitySetup 就能達成的操作——直接使用內建指令即可。
+
+## 工作流程
+
+建立一條自訂指令分為兩步：
+
+### Step 1：在 isa.yml 定義配置
+
+先在 `isa.yml` 登記指令的格式與契約，讓 Linter 能識別並驗證 feature file 中的用法：
+
+```yaml
+instructions:
+  - name: Admin setup
+    format: ^"(?P<alias>[^"]+)" 是一個管理員$
+    instruction_type: custom
+
+    export_vars:
+      "{{alias}}.id":
+        type: Number
+        description: "管理員 ID"
+        nullable: false
+
+    datatable_parameters: {}
+```
+
+配置分為三層契約，只有語法層（`format`）為必填：
+
+| 層 | 欄位 | 職責 |
+|----|------|------|
+| 語法層 | `format` | 正則表達式，識別 step 歸屬並擷取參數 |
+| 輸出層 | `export_vars` | 宣告執行後導出的 `$var`，供 Linter 驗證後續引用 |
+| 輸入層 | `datatable_parameters` | 宣告 DataTable 欄位，供 Linter 驗證拼字與型別 |
+
+完整欄位定義見 [Config 配置](/docs/gherkin/isa/backend/custom/config)。
+
+### Step 2：撰寫 Cucumber Step Definition
+
+根據 `format` 定義的正則表達式撰寫對應的 Step Definition，實作指令的執行邏輯：
+
+```java
+public class AdminSetupSteps {
+
+    @Autowired
+    private ScenarioContextAccessor context;
+
+    @Given("\"({alias})\" 是一個管理員")
+    public void adminSetup(String alias) {
+        // 1. 執行業務邏輯（建立帳號、設定角色...）
+        Long adminId = createAdmin();
+
+        // 2. 將結果存入 context，key 須與 export_vars 宣告一致
+        context.putObject(alias + ".id", adminId);
+    }
+}
+```
+
+在 Step Definition 中，可透過 SpecFormula 提供的 Spring Bean 使用內建指令與符號系統。詳見[開發建議](/docs/gherkin/isa/backend/custom/dev-recommendations)。
+
+## 章節導覽
+
+- [Config 配置](/docs/gherkin/isa/backend/custom/config)：`export_vars`、`datatable_parameters`、`allow_dynamic_parameters` 的完整欄位定義
+- [開發建議](/docs/gherkin/isa/backend/custom/dev-recommendations)：Step Definition 實作教學與 SpecFormula 開發介面參考

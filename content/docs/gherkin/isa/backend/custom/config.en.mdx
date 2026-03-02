@@ -1,0 +1,211 @@
+---
+title: Config
+description: Complete reference for export_vars, datatable_parameters, and allow_dynamic_parameters
+---
+
+Custom instructions extend the base three-field structure with three OPTIONAL fields, giving the Linter a complete input/output contract.
+
+## Instruction Object (Complete Fields)
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `name` | `string` | **REQUIRED** | Unique instruction identifier. Used in error messages; must not duplicate within the same `isa.yml`. |
+| `format` | `string (regex)` | **REQUIRED** | Regex to match a Gherkin Step. Uses `(?P<name>...)` named groups to capture step parameters. |
+| `instruction_type` | `enum` | **REQUIRED** | For this section, the applicable value is `custom`. |
+| `export_vars` | `map<string, ExportVar>` | OPTIONAL | Variable contract exported after execution. Map key is the variable name pattern (may contain `{{param}}` interpolation). |
+| `datatable_parameters` | `map<string, DatatableParam>` | OPTIONAL | DataTable field schema. |
+| `allow_dynamic_parameters` | `boolean` | OPTIONAL | Defaults to `false`. When `true`, the Linter accepts any header. |
+
+---
+
+## allow_dynamic_parameters
+
+| Value | Behavior |
+|-------|----------|
+| `false` (default) | Undeclared headers in the DataTable trigger an `error` |
+| `true` | The Linter accepts any header without error |
+
+Use case: When the Step Definition accepts arbitrary key-value pairs (e.g., product extension fields), setting this to `true` avoids updating the schema every time a new field is added.
+
+```yaml
+- name: Product setup
+  format: ^"(?P<alias>[^"]+)" is a product "(?P<productCode>[^"]+)", with table:$
+  instruction_type: custom
+  allow_dynamic_parameters: true    # ← accept any DataTable fields
+
+  datatable_parameters:
+    name:
+      type: String
+      required: true
+      description: "Product name (required)"
+```
+
+In this example, `name` is required while any other fields are accepted.
+
+Corresponding Gherkin usage:
+
+```gherkin
+Given "Widget" is a product "WIDGET_01", with table:
+  | name   | color | weight |
+  | Widget | red   | 150    |
+
+# Linter validation:
+#   ✓ name is a declared required field
+#   ✓ color, weight are undeclared, but allow_dynamic_parameters: true → no error
+```
+
+---
+
+## export_vars (Output Layer)
+
+Declares which `$var` this instruction exports after execution, available for subsequent steps to reference.
+
+### ExportVar Object
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `type` | `string` | **REQUIRED** | Variable type. Allowed values: `String`, `Boolean`, `Number`. |
+| `description` | `string` | **REQUIRED** | Semantic description of the variable, shown in IDE hover and generated docs. |
+| `example` | `scalar` | OPTIONAL | Example value (number / string / boolean). |
+| `nullable` | `boolean` | OPTIONAL (default `false`) | When `true`, null/empty values are allowed; when `false`, null triggers an `error`. |
+
+### `{{param}}` Interpolation
+
+The Map key of `export_vars` can use `{{param}}` syntax to reference named capture groups from the `format` regex. This allows exported variable names to be dynamically generated based on step parameters.
+
+```yaml
+- name: Admin setup
+  format: ^"(?P<alias>[^"]+)" is an admin, with table:$
+  instruction_type: custom
+
+  export_vars:
+    "{{alias}}.id":             # ← alias comes from (?P<alias>...) in format
+      type: Number
+      description: "Admin ID"
+      example: 1
+      nullable: false
+    "{{alias}}.account":
+      type: String
+      description: "Admin login account"
+      example: "sam"
+      nullable: false
+```
+
+Corresponding Gherkin usage:
+
+```gherkin
+Given "SAM" is an admin, with table:
+  | role        |
+  | SUPER_ADMIN |
+
+# alias captures "SAM", Linter knows this step exports:
+#   $SAM.id      → Number
+#   $SAM.account → String
+
+When (UID="$SAM.id") perform action, call table:
+  | account        |
+  | $SAM.account   |
+
+# Linter validation:
+#   ✓ $SAM.id exists and type is Number
+#   ✓ $SAM.account exists and type is String
+```
+
+### Types
+
+| Type | Description |
+|------|-------------|
+| `String` | String value |
+| `Number` | Integer or decimal number |
+| `Boolean` | `true` / `false` |
+
+---
+
+## datatable_parameters (Input Layer)
+
+Declares which fields the instruction's DataTable accepts, enabling the Linter to validate header spelling, types, and required fields at lint-time.
+
+### DatatableParam Object
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `type` | `string` | **REQUIRED** | Field type. Allowed values: `String`, `Number`, `Boolean`, `Time`. |
+| `description` | `string` | **REQUIRED** | Semantic description of the field, shown in IDE hover and generated docs. |
+| `required` | `boolean` | OPTIONAL (default `false`) | When `true`, a missing field in the DataTable triggers an `error`. |
+| `enums` | `array<scalar>` | OPTIONAL | Enumeration constraint; values not in the list trigger an `error`. |
+
+### Types
+
+| Type | Accepted Values |
+|------|-----------------|
+| `String` | Any string |
+| `Number` | Integers and decimal numbers |
+| `Boolean` | `true` / `false` |
+| `Time` | `@time`, `@date`, `@localTime` time expressions |
+
+### Example
+
+```yaml
+- name: Admin setup
+  format: ^"(?P<alias>[^"]+)" is an admin, with table:$
+  instruction_type: custom
+
+  datatable_parameters:
+    role:
+      type: String
+      required: true
+      description: "Admin role"
+      enums: ["SUPER_ADMIN", "EDITOR", "VIEWER"]
+    department:
+      type: String
+      required: false
+      description: "Department"
+```
+
+Corresponding Gherkin usage:
+
+```gherkin
+Given "SAM" is an admin, with table:
+  | role        | department |
+  | SUPER_ADMIN | Operations |
+
+# Linter validation:
+#   ✓ role is required and "SUPER_ADMIN" is in enums
+#   ✓ department is a declared optional field
+#   ✗ If written as "deparment" (missing a t) → error: undeclared field
+#   ✗ If role value is "ADMIN" → error: not in enums
+#   ✗ If role is omitted → error: required field missing
+```
+
+---
+
+## Complete Example
+
+```yaml
+- name: Admin setup
+  format: ^"(?P<alias>[^"]+)" is an admin, with table:$
+  instruction_type: custom
+
+  export_vars:
+    "{{alias}}.id":
+      type: Number
+      description: "Admin ID"
+      example: 1
+      nullable: false
+    "{{alias}}.account":
+      type: String
+      description: "Admin login account"
+      example: "sam"
+      nullable: false
+
+  datatable_parameters:
+    role:
+      type: String
+      required: true
+      description: "Admin role"
+      enums: ["SUPER_ADMIN", "EDITOR", "VIEWER"]
+    department:
+      type: String
+      required: false
+      description: "Department"
+```
