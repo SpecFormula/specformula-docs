@@ -3,7 +3,7 @@ title: TimeControl
 description: Control mock time in tests
 ---
 
-TimeControl lets you freeze or control time in tests, ensuring stability of time-dependent tests.
+TimeControl sets the time returned by the framework-provided MockTime interface, and controls all time symbols and CAS time constraints that use the `now` keyword. Developers must inject the MockTime interface into their application to replace the system clock, ensuring stability of time-dependent tests.
 
 ## Basic Usage
 
@@ -12,8 +12,8 @@ Given current time is "2026-01-27T10:00:00"
 ```
 
 This instruction will:
-1. Set mock time to `2026-01-27T10:00:00`
-2. All subsequent `@time(now)` expressions will use this time
+1. Set the MockTime interface return time to `2026-01-27T10:00:00`
+2. All time symbols (e.g., `@time(now)`, `@date(now)`) and CAS time constraints (e.g., `&sameTime(now)`) that use `now` will be based on this time
 
 ## Why Control Time?
 
@@ -40,43 +40,30 @@ Then create todo(201) response, with table:
 | ISO without timezone | `2025-11-04T08:00:00` (uses system timezone) |
 | ISO with timezone | `2025-12-25T14:30:00+08:00` |
 | ISO UTC | `2025-12-25T06:30:00Z` |
-| Relative time | `@time(now-1d)`, `@time(now+2h)` |
-
-## Relative Time
-
-Relative time is calculated based on the current mock time:
-
-```gherkin
-Given current time is "2025-11-04T08:00:00"    # Baseline
-Given current time is "@time(now-1d)"          # → 2025-11-03T08:00:00
-Given current time is "@time(now+3h)"          # → 2025-11-03T11:00:00
-```
-
-### Time Units
-
-| Unit | Symbol | Example |
-|------|--------|---------|
-| Seconds | `s` | `now-30s` |
-| Minutes | `m` | `now+5m` |
-| Hours | `h` | `now-2h` |
-| Days | `d` | `now+7d` |
-| Months | `M` (uppercase) | `now-1M` |
-
-### Compound Relative Time
-
-```gherkin
-Given current time is "@time(now-1M-1d+3h)"
-```
+| Time symbol | `@time("2025-12-25T14:30:00")` (see [TIME-System](/docs/gherkin/isa/backend/symbols/time)) |
 
 ## Scope of Effect
 
-Mock time set by TimeControl affects all subsequent instructions:
+The time set by TimeControl affects all expressions that use the `now` keyword:
 
-| Instruction | Affected Behavior |
-|-------------|-------------------|
-| ApiCall | `@time(now)` uses mock time |
-| EntitySetup | `@time(now)` used for data insertion |
-| EntityValidate | `@time(now)` used for validation comparison |
+### Time Symbols
+
+| Symbol | Description |
+|--------|-------------|
+| `@time(now)` | Returns the current MockTime |
+| `@time(now+1d)` | Relative calculation based on current MockTime |
+| `@date(now)` | Returns the current MockTime date |
+| `@localtime(now)` | Returns the current MockTime time (time only) |
+
+### CAS Time Constraints
+
+| Constraint | Description |
+|------------|-------------|
+| `&sameTime(now)` | Validates value equals the current MockTime |
+| `&before(now)` | Validates value is before the current MockTime |
+| `&after(now)` | Validates value is after the current MockTime |
+
+Time symbols and CAS time constraints can be used in DataTable fields of any instruction.
 
 ## Error Handling
 

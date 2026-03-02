@@ -3,7 +3,7 @@ title: TimeControl
 description: 控制測試中的 Mock 時間
 ---
 
-TimeControl 讓你凍結或控制測試中的時間，確保時間相依測試的穩定性。
+TimeControl 設定框架提供的 MockTime 介面回傳的時間，並控制所有使用 `now` 關鍵字的時間符號與 CAS 時間約束。開發者需在應用程式中注入 MockTime 介面取代系統時鐘，以確保時間相依測試的穩定性。
 
 ## 基本用法
 
@@ -12,8 +12,8 @@ Given 現在時間為 "2026-01-27T10:00:00"
 ```
 
 這段指令會：
-1. 設定 Mock 時間為 `2026-01-27T10:00:00`
-2. 所有後續的 `@time(now)` 都會使用這個時間
+1. 將 MockTime 介面的回傳時間設為 `2026-01-27T10:00:00`
+2. 所有使用 `now` 的時間符號（如 `@time(now)`、`@date(now)`）和 CAS 時間約束（如 `&sameTime(now)`）都會以此時間為基準
 
 ## 為什麼需要控制時間？
 
@@ -40,43 +40,30 @@ Then 新增待辦事項(201)回應, with table:
 | ISO 無時區 | `2025-11-04T08:00:00`（使用系統時區） |
 | ISO 含時區 | `2025-12-25T14:30:00+08:00` |
 | ISO UTC | `2025-12-25T06:30:00Z` |
-| 相對時間 | `@time(now-1d)`、`@time(now+2h)` |
-
-## 相對時間
-
-相對時間基於當前 Mock 時間計算：
-
-```gherkin
-Given 現在時間為 "2025-11-04T08:00:00"    # 基準
-Given 現在時間為 "@time(now-1d)"          # → 2025-11-03T08:00:00
-Given 現在時間為 "@time(now+3h)"          # → 2025-11-03T11:00:00
-```
-
-### 時間單位
-
-| 單位 | 符號 | 範例 |
-|------|------|------|
-| 秒 | `s` | `now-30s` |
-| 分 | `m` | `now+5m` |
-| 時 | `h` | `now-2h` |
-| 日 | `d` | `now+7d` |
-| 月 | `M`（大寫） | `now-1M` |
-
-### 複合相對時間
-
-```gherkin
-Given 現在時間為 "@time(now-1M-1d+3h)"
-```
+| 時間符號 | `@time("2025-12-25T14:30:00")`（參見 [TIME-System](/docs/gherkin/isa/backend/symbols/time)） |
 
 ## 影響範圍
 
-TimeControl 設定的 Mock 時間影響所有後續指令：
+TimeControl 設定的時間會影響所有使用 `now` 關鍵字的表達式：
 
-| 指令 | 受影響的行為 |
-|------|-------------|
-| ApiCall | `@time(now)` 使用 Mock 時間 |
-| EntitySetup | `@time(now)` 用於資料插入 |
-| EntityValidate | `@time(now)` 用於驗證比對 |
+### 時間符號
+
+| 符號 | 說明 |
+|------|------|
+| `@time(now)` | 回傳 MockTime 的當前時間 |
+| `@time(now+1d)` | 基於 MockTime 當前時間的相對計算 |
+| `@date(now)` | 回傳 MockTime 的當前日期 |
+| `@localtime(now)` | 回傳 MockTime 的當前時間（僅時間） |
+
+### CAS 時間約束
+
+| 約束 | 說明 |
+|------|------|
+| `&sameTime(now)` | 驗證值等於 MockTime 的當前時間 |
+| `&before(now)` | 驗證值早於 MockTime 的當前時間 |
+| `&after(now)` | 驗證值晚於 MockTime 的當前時間 |
+
+時間符號與 CAS 時間約束可用於任何指令的 DataTable 欄位中。
 
 ## 錯誤處理
 
