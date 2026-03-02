@@ -25,6 +25,13 @@ This instruction will:
 | DataTable | Field-level validation, supports variable extraction |
 | DocString JSON | Complete JSON structure validation |
 
+> **JSON format note**: Symbol system expressions (`$` variables, `&` CAS constraints, `@` time symbols, `>`/`<` extraction keys) must NOT be placed inside JSON string quotes `""`, otherwise they are treated as plain strings.
+>
+> ```
+> { "todoId": $todo1.id }    // ✅ Correct: symbol outside quotes
+> { "todoId": "$todo1.id" }  // ❌ Wrong: symbol wrapped in quotes, treated as plain string
+> ```
+
 ### DataTable Format
 
 ```gherkin
@@ -39,7 +46,7 @@ Then get todo(200) response, with table:
 Then get todo(200) response, with JSON:
   """json
   {
-    "todoId": "$todo1.id",
+    "todoId": $todo1.id,
     "title": "Buy milk",
     "completed": false
   }
@@ -58,13 +65,17 @@ Then get order(200) response, with table:
 
 ## Variable Extraction
 
-Use `>` and `<` pairs to extract values from the response:
+`>` and `<` must be paired vertically in the same column: the header holds the variable name (`>`), and the row holds the source field in the response (`<`).
 
 ```gherkin
 Then login(200) response, with table:
   | >userToken | >userId |
   | <token     | <id     |
 ```
+
+After execution:
+- `userToken` = value of `token` from response
+- `userId` = value of `id` from response
 
 ## Variable Reference
 
@@ -101,7 +112,7 @@ ResponseValidate executes four validation layers in sequence:
 1. **HTTP Status Code**: Fails immediately if status code doesn't match
 2. **JSON Structure Comparison**: Recursively compares JSON nodes
 3. **Value-Level Validation**: Numeric comparison, CAS constraints, variable resolution
-4. **Schema Validation**: Checks types against OpenAPI definitions
+4. **Schema Validation**: Checks types against API Spec definitions
 
 ## Error Handling
 
@@ -119,7 +130,7 @@ ResponseValidate executes four validation layers in sequence:
 | Status code mismatch | Actual status code differs from expected |
 | Field value mismatch | Field value doesn't match expected |
 | JSON structure mismatch | Array length or object fields don't match |
-| Schema validation failed | Doesn't conform to OpenAPI Schema definition |
+| Schema validation failed | Doesn't conform to API Spec Schema definition |
 
 ## Complete Example
 
@@ -127,18 +138,27 @@ ResponseValidate executes four validation layers in sequence:
 Feature: Update Todo
 
   Background:
+    # TimeControl instruction (see TimeControl docs)
     Given current time is "2026-01-27T10:00:00"
+
+    # EntitySetup instruction (see EntitySetup docs)
     Given prepare a user, with table:
       | >Alice.id | name  | email             | status |
       | <userId   | Alice | alice@example.com | ACTIVE |
 
   Example: Update todo title
+
+    # ApiCall instruction (see ApiCall docs)
     When (UID="$Alice.id") create todo, call table:
       | >todo1.id | title    |
       | <todoId   | Buy milk |
     When (UID="$Alice.id") update todo, call table:
       | P:todoId  | title        |
       | $todo1.id | Buy soy milk |
+
+    # ResponseValidate instruction — validate status code and response fields
+    # $todo1.id: references a previously extracted variable
+    # &sameTime(...): CAS time constraint, validates time value
     Then update todo(200) response, with table:
       | todoId    | title        | completed | updatedAt                        |
       | $todo1.id | Buy soy milk | false     | &sameTime("2026-01-27T10:00:00") |
