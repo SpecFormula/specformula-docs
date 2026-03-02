@@ -44,7 +44,7 @@ Then 驗證使用者存在, with:
 
 ```gherkin
 When 批量查詢, call table:
-  | Q:ids                     |
+  | ids                       |
   | ${user1.id},${user2.id}   |
 ```
 
@@ -83,20 +83,22 @@ Data:    | <fieldName  | normalData  | <otherField |
          ↑ 配對         ↑ 非配對       ↑ 配對
 ```
 
+> **重複 Context Key**：若多個步驟使用相同的 `>contextKey`，Lint 會發出警告。框架執行時後者會覆蓋前者的值。
+
 ## 引號規則
 
 - DataTable 中被引號包裹時**不解析**：`"$var"` 視為純字串
-- JSON DocString 中變數**必須加引號**：
+- JSON DocString 中變數**不可放在 `""` 內**，否則視為純字串：
 
 ```gherkin
-# ✅ 正確
-"""json
-{ "userId": "$userId" }
-"""
-
-# ❌ 錯誤（無法轉換為 JSON）
+# ✅ 正確：符號在引號外
 """json
 { "userId": $userId }
+"""
+
+# ❌ 錯誤：符號被引號包裹，視為純字串
+"""json
+{ "userId": "$userId" }
 """
 ```
 

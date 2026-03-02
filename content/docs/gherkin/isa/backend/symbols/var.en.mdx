@@ -44,7 +44,7 @@ Then validate user exists, with:
 
 ```gherkin
 When batch query, call table:
-  | Q:ids                     |
+  | ids                       |
   | ${user1.id},${user2.id}   |
 ```
 
@@ -83,20 +83,22 @@ Data:    | <fieldName  | normalData  | <otherField |
          ↑ paired       ↑ not paired  ↑ paired
 ```
 
+> **Duplicate Context Key**: If multiple steps use the same `>contextKey`, Lint will issue a warning. At runtime, the later value overwrites the earlier one.
+
 ## Quote Rules
 
 - When wrapped in quotes in DataTable, **not parsed**: `"$var"` is treated as plain string
-- In JSON DocString, variables **must be quoted**:
+- In JSON DocString, variables must **NOT** be placed inside `""`, otherwise treated as plain string:
 
 ```gherkin
-# ✅ Correct
-"""json
-{ "userId": "$userId" }
-"""
-
-# ❌ Wrong (cannot convert to JSON)
+# ✅ Correct: symbol outside quotes
 """json
 { "userId": $userId }
+"""
+
+# ❌ Wrong: symbol wrapped in quotes, treated as plain string
+"""json
+{ "userId": "$userId" }
 """
 ```
 
