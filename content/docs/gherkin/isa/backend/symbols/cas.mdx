@@ -30,11 +30,13 @@ Then 回應, with table:
 Then 回應為, with JSON:
   """json
   {
-    "id": "&isNum &gt(0)",
-    "name": "&isStr &contains(王)"
+    "id": &isNum &gt(0),
+    "name": &isStr &contains(王)
   }
   """
 ```
+
+> **注意**：符號系統的表達式不可放在 JSON 字串引號 `""` 內，否則會被視為純字串。
 
 ## 約束清單
 
@@ -105,6 +107,23 @@ Then 回應為, with JSON:
 | `&sameDay(date)` | `&sameDay("2025-11-04")` |
 | `&timeRange(start,end)` | `&timeRange("09:00","17:00")` |
 | `&withinDays(days)` | `&withinDays(7)` |
+
+時間約束的參數支援 `now` 關鍵字與相對時間語法，會以 TimeControl 設定的 MockTime 為基準。
+
+支援的相對時間單位：
+
+| 單位 | 符號 | 範例 |
+|------|------|------|
+| 秒 | `s`（小寫） | `now-30s` |
+| 分 | `m`（小寫） | `now+5m` |
+| 時 | `h`（小寫） | `now-2h` |
+| 日 | `d`（小寫） | `now+7d` |
+| 月 | `M`（大寫） | `now-1M` |
+
+```gherkin
+| createdAt      | expiresAt      | updatedAt        |
+| &sameTime(now) | &after(now+7d) | &before(now-30m) |
+```
 
 ## 多約束組合
 

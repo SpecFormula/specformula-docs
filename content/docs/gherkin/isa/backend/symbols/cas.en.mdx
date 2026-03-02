@@ -30,11 +30,13 @@ Then response, with table:
 Then response, with JSON:
   """json
   {
-    "id": "&isNum &gt(0)",
-    "name": "&isStr &contains(Wang)"
+    "id": &isNum &gt(0),
+    "name": &isStr &contains(Wang)
   }
   """
 ```
+
+> **Note**: Symbol system expressions must NOT be placed inside JSON string quotes `""`, otherwise they are treated as plain strings.
 
 ## Constraint List
 
@@ -105,6 +107,23 @@ Then response, with JSON:
 | `&sameDay(date)` | `&sameDay("2025-11-04")` |
 | `&timeRange(start,end)` | `&timeRange("09:00","17:00")` |
 | `&withinDays(days)` | `&withinDays(7)` |
+
+Time constraint parameters support the `now` keyword and relative time syntax, which resolve to the MockTime set by TimeControl.
+
+Supported relative time units:
+
+| Unit | Symbol | Example |
+|------|--------|---------|
+| Seconds | `s` (lowercase) | `now-30s` |
+| Minutes | `m` (lowercase) | `now+5m` |
+| Hours | `h` (lowercase) | `now-2h` |
+| Days | `d` (lowercase) | `now+7d` |
+| Months | `M` (uppercase) | `now-1M` |
+
+```gherkin
+| createdAt      | expiresAt      | updatedAt        |
+| &sameTime(now) | &after(now+7d) | &before(now-30m) |
+```
 
 ## Multiple Constraint Combination
 
