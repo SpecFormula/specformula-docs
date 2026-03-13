@@ -117,6 +117,23 @@ Gherkin: userId    → DB: user_id
 Gherkin: createdAt → DB: created_at
 ```
 
+在查詢或驗證資料庫欄位時，框架同樣會對每一個欄位名稱套用三層匹配邏輯：
+
+- **第一層：精確匹配**
+  - 先用原始欄位名稱直接找，例如 `userId` 對 `userId`。
+- **第二層：camelCase → snake_case**
+  - 若找不到精確匹配，會將 `userId` 轉成 `user_id`，再嘗試匹配 DDL / 實際資料的欄位名稱。
+- **第三層：忽略大小寫**
+  - 若前兩層都沒找到，最後會以「忽略大小寫」的方式比對，例如 `user_id`、`USER_ID`、`User_Id` 都會被視為同一個欄位。
+
+| Feature 欄位名稱 | DDL / Map 欄位名稱 | 是否匹配 | 說明 |
+|------------------|--------------------|----------|------|
+| `userId`         | `userId`           | ✅ 是 | 第一層：直接 `equals` 匹配 |
+| `userId`         | `user_id`          | ✅ 是 | 第二層：camelCase → snake_case |
+| `userId`         | `USER_ID`          | ✅ 是 | 第二層轉成 `user_id` 後，再第三層 `equalsIgnoreCase` 匹配 |
+
+實務上只要在 Spec 中統一使用 camelCase，無論 DDL 是 snake_case 還是慣用全大寫命名，都能被穩定解析，避免在 SQL／程式碼裡手動處理大小寫與底線差異。
+
 ### Schema 驗證
 
 SpecFormula 會根據 DDL 驗證 DataTable 中的欄位是否存在：
