@@ -3,9 +3,16 @@ title: ApiCall
 description: Execute HTTP API requests with declarative syntax
 ---
 
-ApiCall lets you declare API call parameters and response extraction directly in Gherkin, without writing HTTP request code.
+ApiCall lets you declare API call parameters and response extraction directly in Gherkin, without writing HTTP request code. It supports both DataTable and JSON formats.
 
-## Basic Usage
+## Two Formats
+
+| Format | Use Case |
+|--------|----------|
+| DataTable | Flat fields, intuitive and readable |
+| DocString JSON | Nested structures, closer to actual Request Body |
+
+### DataTable Format
 
 ```gherkin
 When (UID="$Alice.id") create todo, call table:
@@ -13,11 +20,30 @@ When (UID="$Alice.id") create todo, call table:
   | <todoId   | Buy milk |
 ```
 
-This instruction will:
+### JSON Format
+
+```gherkin
+When (UID="$Alice.id") create todo, call JSON:
+  """json
+  {
+    >todo1.id: <todoId,
+    "title": "Buy milk"
+  }
+  """
+```
+
+Both produce the same result:
 1. Use `$Alice.id` as the caller identity (Bearer Token)
 2. Call the API with summary "create todo" in the API Spec
 3. Send `title: Buy milk` as the Request Body
 4. Extract the `todoId` field from the response and store it in variable `todo1.id`
+
+> **JSON format note**: Symbol system expressions (`$` variables, `&` CAS constraints, `@` time symbols, `>`/`<` extraction keys) must NOT be placed inside JSON string quotes `""`, otherwise they are treated as plain strings.
+>
+> ```
+> { "title": $todo1.title }    // ✅ Correct: symbol outside quotes
+> { "title": "$todo1.title" }  // ❌ Wrong: symbol wrapped in quotes, treated as plain string
+> ```
 
 ## Field Syntax
 
@@ -31,6 +57,34 @@ DataTable field names support special prefixes to specify parameter types:
 | `H:` | HTTP Header | `H:X-Trace-Id` |
 | `>` | Store into variable — defines the variable name to save the response value | `>todo1.id` |
 | `<` | Extract from response — specifies the source field in the response JSON | `<todoId` |
+
+### JSON Format Prefix Syntax
+
+JSON format uses uppercase letter prefixes with quotes, corresponding to the DataTable `P:`/`Q:`/`H:` prefixes:
+
+| DataTable | JSON | Description |
+|-----------|------|-------------|
+| `P:todoId` | `P"todoId"` | Path parameter |
+| `Q:page` | `Q"page"` | Query parameter |
+| `H:X-Trace-Id` | `H"X-Trace-Id"` | HTTP Header |
+
+```gherkin
+# DataTable version
+When (UID="$Alice.id") update todo, call table:
+  | P:todoId  | Q:verbose | H:X-Trace | title        |
+  | $todo1.id | true      | trace-123 | Buy soy milk |
+
+# JSON version
+When (UID="$Alice.id") update todo, call JSON:
+  """json
+  {
+    P"todoId": $todo1.id,
+    Q"verbose": "true",
+    H"X-Trace": "trace-123",
+    "title": "Buy soy milk"
+  }
+  """
+```
 
 ### Variable Extraction Pairing
 
@@ -148,11 +202,25 @@ When a Body field name matches a Path/Query/Header parameter name in the API Spe
 Supports dot notation and array indexing for automatic deep JSON construction:
 
 ```gherkin
+# DataTable — use dot notation for nested structures
 | name       | config.theme | tags[0] | tags[1] |
 | My Project | dark         | work    | urgent  |
 ```
 
-Produces:
+JSON format allows directly writing nested structures, which is more intuitive:
+
+```gherkin
+# JSON — describe nested structure directly
+"""json
+{
+  "name": "My Project",
+  "config": { "theme": "dark" },
+  "tags": ["work", "urgent"]
+}
+"""
+```
+
+Both produce the same Request Body:
 
 ```json
 {
