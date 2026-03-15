@@ -50,6 +50,11 @@ instructions:
     format: ^\((?:No Actor|UID="(?P<userId>\$[\w.]+)")\) (?P<summary>.+?), call table:$
     instruction_type: api_call
 
+  - name: API call (JSON)
+    format: ^\((?:No Actor|UID="(?P<userId>\$[\w.]+)")\) (?P<summary>.+?), call JSON:$
+    instruction_type: api_call
+    data_format: json
+
   - name: Response validation
     format: ^(?P<summary>.+?)\((?P<status_code>\d{3})\) response,?\s*with table:$
     instruction_type: response_validate

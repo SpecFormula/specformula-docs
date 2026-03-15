@@ -3,9 +3,16 @@ title: ApiCall
 description: 以宣告式語法執行 HTTP API 請求
 ---
 
-ApiCall 讓你直接在 Gherkin 中宣告 API 呼叫的參數與回應擷取，無需撰寫 HTTP 請求的程式碼。
+ApiCall 讓你直接在 Gherkin 中宣告 API 呼叫的參數與回應擷取，無需撰寫 HTTP 請求的程式碼。支援 DataTable 和 JSON 兩種格式。
 
-## 基本用法
+## 兩種格式
+
+| 格式 | 適用場景 |
+|------|----------|
+| DataTable | 扁平欄位，直覺易讀 |
+| DocString JSON | 巢狀結構，貼近實際 Request Body |
+
+### DataTable 格式
 
 ```gherkin
 When (UID="$Alice.id") 新增待辦事項, call table:
@@ -13,11 +20,30 @@ When (UID="$Alice.id") 新增待辦事項, call table:
   | <todoId   | 買牛奶 |
 ```
 
-這段指令會：
+### JSON 格式
+
+```gherkin
+When (UID="$Alice.id") 新增待辦事項, call JSON:
+  """json
+  {
+    >todo1.id: <todoId,
+    "title": "買牛奶"
+  }
+  """
+```
+
+兩者效果相同：
 1. 以 `$Alice.id` 作為呼叫者身份（Bearer Token）
 2. 呼叫 API Spec 中 summary 為「新增待辦事項」的 API
 3. 將 `title: 買牛奶` 作為 Request Body
 4. 從回應中擷取 `todoId` 欄位，存入變數 `todo1.id`
+
+> **JSON 格式注意事項**：符號系統的表達式（`$`變數、`&`CAS 約束、`@`時間符號、`>`/`<`擷取鍵）不可放在 JSON 字串引號 `""` 內，否則會被視為純字串。
+>
+> ```
+> { "title": $todo1.title }    // 正確：符號在引號外
+> { "title": "$todo1.title" }  // 錯誤：符號被引號包裹，視為純字串
+> ```
 
 ## 欄位語法
 
@@ -31,6 +57,34 @@ DataTable 的欄位名稱支援特殊前綴，用於指定參數類型：
 | `H:` | HTTP Header | `H:X-Trace-Id` |
 | `>` | 存入變數 — 定義要儲存回應值的變數名稱 | `>todo1.id` |
 | `<` | 取自回應 — 指定回應 JSON 中的來源欄位 | `<todoId` |
+
+### JSON 格式的前綴語法
+
+JSON 格式使用大寫字母前綴加引號的語法，對應 DataTable 的 `P:`/`Q:`/`H:` 前綴：
+
+| DataTable | JSON | 說明 |
+|-----------|------|------|
+| `P:todoId` | `P"todoId"` | Path 參數 |
+| `Q:page` | `Q"page"` | Query 參數 |
+| `H:X-Trace-Id` | `H"X-Trace-Id"` | HTTP Header |
+
+```gherkin
+# DataTable 版本
+When (UID="$Alice.id") 更新待辦事項, call table:
+  | P:todoId  | Q:verbose | H:X-Trace | title  |
+  | $todo1.id | true      | trace-123 | 買豆漿 |
+
+# JSON 版本
+When (UID="$Alice.id") 更新待辦事項, call JSON:
+  """json
+  {
+    P"todoId": $todo1.id,
+    Q"verbose": "true",
+    H"X-Trace": "trace-123",
+    "title": "買豆漿"
+  }
+  """
+```
 
 ### 擷取變數配對
 
@@ -148,11 +202,25 @@ When (UID="$Alice.id") 新增待辦事項, call table:
 支援 dot notation 和陣列索引，自動建構深層 JSON：
 
 ```gherkin
+# DataTable — 使用 dot notation 表達巢狀結構
 | name   | config.theme | tags[0] | tags[1] |
 | 我的專案 | dark        | work    | urgent  |
 ```
 
-產生：
+JSON 格式可直接寫出巢狀結構，更直覺：
+
+```gherkin
+# JSON — 直接描述巢狀結構
+"""json
+{
+  "name": "我的專案",
+  "config": { "theme": "dark" },
+  "tags": ["work", "urgent"]
+}
+"""
+```
+
+兩者產生相同的 Request Body：
 
 ```json
 {
