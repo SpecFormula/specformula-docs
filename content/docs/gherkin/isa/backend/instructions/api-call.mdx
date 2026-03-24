@@ -266,8 +266,47 @@ ApiCall 中的時間值會根據 `isa.yml` 設定的 `time_format` 自動轉換�
 | 錯誤 | 說明 |
 |------|------|
 | 欄位不存在 | DataTable 中的欄位名稱在 API Spec 找不到定義 |
-| 缺少必填欄位 | OpenAPI 標記為 required 的參數未提供 |
+| 缺少必填欄位 | OpenAPI 標記為 required 的參數未提供（可透過 `@allow-missing-parameters` 於特定情境放寬） |
 | 擷取欄位不存在 | `<` 指定的回應欄位在 Response Schema 中找不到 |
+
+## `@allow-missing-parameters`：允許參數型前置條件
+
+當你的測試目標是「驗證 API 會拒絕缺少/無效的必填參數」時，可在 Example（或 Scenario）加上 `@allow-missing-parameters`，讓 **必填參數檢查** 在該情境被跳過，但其他契約檢查仍維持啟用。
+
+```gherkin
+Feature: 查詢 API 參數驗證
+
+  Rule: 必填參數驗證規則
+
+    Example: 提供完整參數應該成功
+      When (UID="$Alice.id") 查詢資料, call table:
+        | Q:startDate | Q:endDate  | Q:pageNo | Q:pageSize |
+        | 2024-01-01  | 2024-01-31 | 1        | 10         |
+      Then 查詢資料(200)回應, with table:
+        | success |
+        | true    |
+
+    @allow-missing-parameters
+    Example: 缺少必填參數 startDate 應該失敗
+      When (UID="$Alice.id") 查詢資料, call table:
+        | Q:endDate  | Q:pageNo | Q:pageSize |
+        | 2024-01-31 | 1        | 10         |
+      Then 查詢資料(400)回應, with table:
+        | errorCode                  |
+        | MISSING_REQUIRED_PARAMETER |
+```
+
+### 何時使用
+
+- 缺少 OpenAPI required 參數（例如少 `Q:startDate`）
+- 必填參數值無效，且你的後端會以「缺少/無效參數」類型錯誤回應
+
+### 何時不要使用
+
+- 業務規則驗證失敗（例如查詢區間超過 6 個月）
+- 權限或認證失敗
+- 資料狀態不符（例如重複申請）
+- 參數完整且格式正確，但因業務邏輯被拒絕
 
 ### 執行階段
 
