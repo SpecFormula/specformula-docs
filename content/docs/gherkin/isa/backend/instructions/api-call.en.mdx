@@ -266,8 +266,47 @@ Time values in ApiCall are automatically converted based on the `time_format` se
 | Error | Description |
 |-------|-------------|
 | Field not found | Field name in DataTable not found in API Spec |
-| Missing required field | Parameter marked as required in OpenAPI not provided |
+| Missing required field | Required parameter marked in OpenAPI is not provided (can be relaxed in specific scenarios with `@allow-missing-parameters`) |
 | Extract field not found | Field specified with `<` not found in Response Schema |
+
+## `@allow-missing-parameters`: Allow Parameter-Validation Preconditions
+
+When your test goal is to verify that the API rejects missing/invalid required parameters, you can add `@allow-missing-parameters` on an Example (or Scenario). This skips the **required-parameter check** for that scenario, while keeping other contract checks enabled.
+
+```gherkin
+Feature: Query API parameter validation
+
+  Rule: Required parameter validation rules
+
+    Example: Should succeed with complete parameters
+      When (UID="$Alice.id") query data, call table:
+        | Q:startDate | Q:endDate  | Q:pageNo | Q:pageSize |
+        | 2024-01-01  | 2024-01-31 | 1        | 10         |
+      Then query data(200) response, with table:
+        | success |
+        | true    |
+
+    @allow-missing-parameters
+    Example: Should fail when required parameter startDate is missing
+      When (UID="$Alice.id") query data, call table:
+        | Q:endDate  | Q:pageNo | Q:pageSize |
+        | 2024-01-31 | 1        | 10         |
+      Then query data(400) response, with table:
+        | errorCode                  |
+        | MISSING_REQUIRED_PARAMETER |
+```
+
+### When to Use
+
+- Missing an OpenAPI required parameter (for example, missing `Q:startDate`)
+- Required parameter value is invalid, and your backend returns a "missing/invalid parameter" type of error
+
+### When Not to Use
+
+- Business rule validation failures (for example, query range exceeds 6 months)
+- Authorization or authentication failures
+- Invalid data state (for example, duplicate request)
+- Parameters are complete and well-formed, but rejected by business logic
 
 ### Runtime
 
