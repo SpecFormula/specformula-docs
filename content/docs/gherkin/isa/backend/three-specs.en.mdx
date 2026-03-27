@@ -309,6 +309,25 @@ Gherkin: punchType  → DB: punch_type
 Gherkin: punchTime  → DB: punch_time
 ```
 
+When matching against actual database columns, the framework applies a three-step resolution strategy for each field name:
+
+- **Step 1: exact match**
+  - First, it looks for the original field name as-is, for example `agentId` vs `agentId`.
+- **Step 2: camelCase → snake_case**
+  - If no exact match is found, it converts `agentId` to `agent_id` and tries to match again against the DDL / actual data.
+- **Step 3: case-insensitive**
+  - If the first two steps still fail, it finally falls back to case-insensitive comparison, so `agent_id`, `AGENT_ID`, and `Agent_Id` are treated as the same column.
+
+The following table shows some common combinations (left is the Feature/DataTable field, right is the DDL/actual Map key):
+
+| Feature field name | DDL / Map field name | Match? | Explanation |
+|--------------------|----------------------|--------|-------------|
+| `agentId`          | `agentId`            | ✅ Yes | Step 1: direct `equals` match |
+| `agentId`          | `agent_id`           | ✅ Yes | Step 2: camelCase → snake_case |
+| `agentId`          | `AGENT_ID`           | ✅ Yes | Step 2 to `agent_id`, then Step 3 `equalsIgnoreCase` |
+
+In practice, as long as you consistently use camelCase in Spec/Gherkin, the engine can reliably resolve typical snake_case or upper-case column names in the DDL, without requiring manual handling of case or underscores in tests or code.
+
 ---
 
 ## ISA Config (Configuration)
