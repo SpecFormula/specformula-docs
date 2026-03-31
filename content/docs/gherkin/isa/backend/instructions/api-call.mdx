@@ -54,9 +54,12 @@ DataTable 的欄位名稱支援特殊前綴，用於指定參數類型：
 | （無） | Request Body 欄位；若欄位名稱同時存在於 API Spec 的 Path/Query/Header 參數中，會自動帶入對應位置（等同同時填寫 `P:`/`Q:`/`H:`） | `title`、`todoId` |
 | `P:` | Path 參數 | `P:todoId` → 替換 URL 中的 `{todoId}` |
 | `Q:` | Query 參數 | `Q:page` → `?page=value` |
-| `H:` | HTTP Header | `H:X-Trace-Id` |
+| `H:` | Request Header | `H:X-Trace-Id` |
+| `B:` | 顯式標記整個 Request Body（裸值、陣列、物件） | `B:` → 將 cell 值作為整個 body |
 | `>` | 存入變數 — 定義要儲存回應值的變數名稱 | `>todo1.id` |
 | `<` | 取自回應 — 指定回應 JSON 中的來源欄位 | `<todoId` |
+| `<H:` | 取自回應 Header — 指定回應 Header 的來源欄位 | `<H:Location` |
+| `<B:` | 取自回應 Body（裸值） — 擷取整個 response body | `<B:` |
 
 ### JSON 格式的前綴語法
 
@@ -66,7 +69,8 @@ JSON 格式使用大寫字母前綴加引號的語法，對應 DataTable 的 `P:
 |-----------|------|------|
 | `P:todoId` | `P"todoId"` | Path 參數 |
 | `Q:page` | `Q"page"` | Query 參數 |
-| `H:X-Trace-Id` | `H"X-Trace-Id"` | HTTP Header |
+| `H:X-Trace-Id` | `H"X-Trace-Id"` | Request Header |
+| `B:` | `B:` | 顯式標記整個 Body |
 
 ```gherkin
 # DataTable 版本
@@ -98,6 +102,36 @@ When (UID="$Alice.id") 更新待辦事項, call JSON:
 執行後：
 - `todo1.id` = 回應中的 `todoId` 值
 - `todo1.title` = 回應中的 `title` 值
+
+### 擷取 Response Header
+
+使用 `<H:` 前綴擷取回應中的 HTTP Header 值：
+
+```gherkin
+# DataTable — 擷取 Location header
+When (No Actor) 新增資源, call table:
+  | >loc        | name   |
+  | <H:Location | 測試資源 |
+
+# JSON — 擷取 X-Request-Id header
+When (No Actor) 新增資源, call JSON:
+  """json
+  {
+    >requestId: <H"X-Request-Id",
+    "name": "測試資源"
+  }
+  """
+```
+
+### 擷取裸值 Response Body
+
+當 API 回傳裸值（如 `true`、`42`）而非 JSON 物件時，使用 `<B:` 擷取整個 response body：
+
+```gherkin
+When (No Actor) 查詢資源狀態, call table:
+  | >result | P:id  |
+  | <B:     | $res1 |
+```
 
 ---
 
@@ -228,6 +262,115 @@ JSON 格式可直接寫出巢狀結構，更直覺：
   "config": { "theme": "dark" },
   "tags": ["work", "urgent"]
 }
+```
+
+### Key 含 `.` 的逃脫語法
+
+當 JSON key 本身包含 `.` 字元時（如 `"btn.save"`），使用 `["..."]` bracket notation 避免被誤拆為多層巢狀：
+
+```gherkin
+# DataTable — 使用 bracket notation
+| content.["btn.save"] | content.["btn.cancel"] |
+| 儲存                  | 取消                    |
+```
+
+JSON DocString 扁平化時會自動處理逃脫，使用者直接撰寫原始 key 即可：
+
+```gherkin
+# JSON — key 自然包含 "."，框架自動處理
+"""json
+{
+  "content": {
+    "btn.save": "儲存",
+    "btn.cancel": "取消"
+  }
+}
+"""
+```
+
+`["..."]`（字串 key 逃脫）與 `[0]`（陣列索引）可共存於同一路徑中：
+
+```
+data.[0].["field.name"]
+→ data 為物件 key、[0] 為陣列索引、["field.name"] 為含 "." 的物件 key
+```
+
+## 頂層陣列 Body
+
+當 API 的 request body 為頂層陣列（如批次建立），JSON DocString 可直接使用 `[...]` 作為頂層：
+
+```gherkin
+When (No Actor) 批次新增待辦事項, call JSON:
+  """json
+  [
+    { "title": "買牛奶", "priority": 1 },
+    { "title": "寫報告", "priority": 2 }
+  ]
+  """
+```
+
+需同時傳遞 Path/Query/Header 參數時，頂層維持 `{}`，以 `B:` 標記 body 內容：
+
+```gherkin
+When (No Actor) 批次新增待辦事項, call JSON:
+  """json
+  {
+    P"projectId": $project1.id,
+    Q"notify": "true",
+    B: [
+      { "title": "買牛奶", "priority": 1 },
+      { "title": "寫報告", "priority": 2 }
+    ]
+  }
+  """
+```
+
+等價 DataTable：
+
+```gherkin
+| P:projectId  | Q:notify | [0].title | [0].priority | [1].title | [1].priority |
+| $project1.id | true     | 買牛奶     | 1            | 寫報告     | 2            |
+```
+
+`B:` 對物件 Body 也適用，提供「參數與 body 視覺分離」的選項（非前綴 key 的隱式 body 規則維持向後相容）：
+
+```gherkin
+# 隱式 body（現行寫法，向後相容）
+"""json
+{ P"projectId": $project1.id, "title": "買牛奶", "priority": 1 }
+"""
+
+# 顯式 B: body（等價寫法）
+"""json
+{
+  P"projectId": $project1.id,
+  B: { "title": "買牛奶", "priority": 1 }
+}
+"""
+```
+
+> **注意**：`B:` 與非前綴的一般 key（如 `"name"`）不可共存——使用 `B:` 時，body 全部收納於 `B:` 值內。
+
+## 裸值 Body
+
+當 API 的 request body 接受原始型別（`boolean`、`string`、`integer`），使用 `B:` 標記裸值：
+
+```gherkin
+# DataTable — B: 前綴承載裸值
+When 切換資源狀態, call table:
+  | P:id  | B:   |
+  | $res1 | true |
+
+# JSON — B: 承載裸值
+When (No Actor) 切換資源狀態, call JSON:
+  """json
+  { P"id": $res1, B: true }
+  """
+
+When (No Actor) 提交回饋, call JSON:
+  """json
+  { B: "這是一段回饋" }
+  """
 ```
 
 ## 呼叫者身份

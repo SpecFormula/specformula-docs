@@ -68,9 +68,19 @@ instructions:
     format: ^應該存在一個(?P<entity>[\u4e00-\u9fffa-zA-Z0-9_]+), with table:$
     instruction_type: entity_validate
 
+  - name: Database validation (JSON)
+    format: ^應該存在一個(?P<entity>[\u4e00-\u9fffa-zA-Z0-9_]+), with json:$
+    instruction_type: entity_validate
+    data_format: json
+
   - name: Database non-existence validation
     format: ^應該不存在一個(?P<entity>[\u4e00-\u9fffa-zA-Z0-9_]+), with table:$
     instruction_type: entity_non_existence_validate
+
+  - name: Data preparation (JSON)
+    format: ^準備一個(?P<entity>[\u4e00-\u9fffa-zA-Z0-9_]+), with json:$
+    instruction_type: entity_setup
+    data_format: json
 ```
 
 ## API 配置
@@ -118,6 +128,32 @@ instructions:
 | `resource_path` | DDL 與 mapping 檔案在 classpath 中的路徑（必填） | — |
 | `project_path` | DDL 與 mapping 檔案在專案中的路徑（供 Lint 使用，必填） | — |
 | `db_type` | 資料庫類型：`h2`、`postgresql`、`mysql`、`mssql` | `h2` |
+| `schema` | 指定 DataSource 連線的預設 schema（選填） | 資料庫預設值 |
+
+### Schema 設定
+
+`schema` 欄位用於企業級多 schema 架構，指定 DataSource 連線的預設 schema：
+
+```yaml
+config:
+  data:
+    source:
+      - name: default
+        resource_path: specs/data
+        db_type: postgresql
+        schema: app_schema       # 選填
+```
+
+各資料庫的行為差異：
+
+| db_type | schema 行為 | 預設 schema |
+|---------|------------|-------------|
+| `postgresql` | 設定 `search_path` 為 `"<schema>", public` | `public` |
+| `mssql` | 設定連線的 `DEFAULT_SCHEMA` | `dbo` |
+| `mysql` / `mariadb` | 忽略（schema 等同於 database，由連線 URL 決定） | N/A |
+| `h2` | 忽略（內嵌測試資料庫，不支援多 schema 路由） | `PUBLIC` |
+
+DDL 中的 `CREATE TABLE` 語句可包含 schema 前綴（如 `CREATE TABLE dbo.users (...)`），框架會擷取並保存 schema 前綴，在生成的 SQL 中使用完整限定名（`schema.table`）。
 
 ### 資料夾結構
 

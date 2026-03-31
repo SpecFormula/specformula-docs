@@ -63,6 +63,60 @@ Then get order(200) response, with table:
   | $order1.id    | Product A          | Product B          |
 ```
 
+### Escaping Keys Containing `.`
+
+When a JSON key itself contains a `.` character, use `["..."]` bracket notation to prevent it from being split into nested levels:
+
+```gherkin
+Then get settings(200) response, with table:
+  | content.["btn.save"] | content.["btn.cancel"] |
+  | Save                 | Cancel                 |
+```
+
+## Response Header Validation
+
+Use the `H:` prefix to validate HTTP Header values in the response:
+
+```gherkin
+# DataTable
+Then create resource(201) response, with table:
+  | H:Location       | id |
+  | /api/resources/1 | 1  |
+
+# JSON
+Then create resource(201) response, with JSON:
+  """json
+  {
+    H"Location": "/api/resources/1",
+    "id": 1
+  }
+  """
+```
+
+## Bare Value and Top-Level Array Response Body
+
+When API returns bare values (e.g., `true`, `42`) or top-level arrays, use `B:` to mark the entire response body:
+
+```gherkin
+# Bare value validation
+Then get resource status(200) response, with JSON:
+  """json
+  { B: true }
+  """
+
+# Top-level array validation + Response Header
+Then batch create resources(201) response, with JSON:
+  """json
+  {
+    H"X-Total-Count": "2",
+    B: [
+      { "id": 1, "name": "Resource A" },
+      { "id": 2, "name": "Resource B" }
+    ]
+  }
+  """
+```
+
 ## Variable Extraction
 
 `>` and `<` must be paired vertically in the same column: the header holds the variable name (`>`), and the row holds the source field in the response (`<`).

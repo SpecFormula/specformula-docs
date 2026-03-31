@@ -50,6 +50,95 @@ Given prepare a todo, with table:
   | $Alice.id | Buy milk |
 ```
 
+## JSON Field Description
+
+When Entity fields store JSON objects (e.g., PostgreSQL JSONB, MySQL JSON), two methods are available to describe JSON field content.
+
+### JSON Path DataTable Header
+
+Use path syntax in DataTable headers to expand JSON structures:
+
+```gherkin
+Given prepare an order, with table:
+  | id | orderItems[0].productId | orderItems[0].quantity | orderItems[1].productId | orderItems[1].quantity |
+  | 1  | 5                       | 2                      | 6                       | 10                     |
+```
+
+Equivalent to the compressed single-line string:
+
+```gherkin
+Given prepare an order, with table:
+  | id | orderItems                                                   |
+  | 1  | [{"productId":5,"quantity":2},{"productId":6,"quantity":10}] |
+```
+
+With Symbol System:
+
+```gherkin
+Given prepare an order, with table:
+  | id | orderItems[0].productId | orderItems[0].createdAt |
+  | 1  | $productId              | @time(now)              |
+```
+
+### JSON DocString Format
+
+Use `with json:` with `"""json ... """` to write structured JSON directly, ideal for deeply nested structures:
+
+```gherkin
+Given prepare an order, with json:
+  """json
+  {
+    "id": 1,
+    "orderItems": [
+      { "productId": 5, "quantity": 2 },
+      { "productId": 6, "quantity": 10 }
+    ]
+  }
+  """
+```
+
+Multiple records using JSON Array:
+
+```gherkin
+Given prepare an order detail, with json:
+  """json
+  [
+    { "orderId": 1, "productId": 101, "quantity": 2 },
+    { "orderId": 1, "productId": 102, "quantity": 1 }
+  ]
+  """
+```
+
+With Symbol System:
+
+```gherkin
+Given prepare an order, with json:
+  """json
+  {
+    >orderId: <id,
+    "orderNo": "ORD-001",
+    "createdAt": @time(now),
+    "orderItems": [
+      { "productId": $productId, "quantity": 2 }
+    ]
+  }
+  """
+```
+
+> **JSON format note**: Symbol system expressions (`$` variables, `&` CAS constraints, `@` time symbols, `>`/`<` extraction keys) must NOT be placed inside JSON string quotes `""`, otherwise they are treated as plain strings.
+
+### Escaping Keys Containing `.`
+
+When a JSON key itself contains a `.` character, use `["..."]` bracket notation to prevent it from being split into nested levels:
+
+```gherkin
+Given prepare a setting, with table:
+  | id | content.["btn.save"] | content.["btn.cancel"] |
+  | 1  | Save                 | Cancel                 |
+```
+
+In JSON DocString, use the original key directly — the framework handles escaping automatically.
+
 ---
 
 ## Mapping to Entity Spec
