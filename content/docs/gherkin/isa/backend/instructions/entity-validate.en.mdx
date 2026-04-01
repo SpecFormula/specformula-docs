@@ -74,6 +74,53 @@ Then should exist a todo, with table:
 | `todos` table | `entity_to_table_mapping` value |
 | `todoId`, `title` fields | DDL field definitions |
 
+## JSON DocString Format
+
+Use `with json:` with `"""json ... """` to validate JSON-typed field structures and values:
+
+```gherkin
+Then should exist an order, with json:
+  """json
+  {
+    "id": $order1.id,
+    "orderItems": [
+      { "productId": 5, "quantity": 2 },
+      { "productId": 6, "quantity": 10 }
+    ]
+  }
+  """
+```
+
+With Symbol System:
+
+```gherkin
+Then should exist an order, with json:
+  """json
+  {
+    "id": $order1.id,
+    "orderNo": &startsWith("ORD-"),
+    "createdAt": &sameTime("2026-01-27T10:00:00"),
+    "orderItems": [
+      { "productId": $productId, "quantity": &gt(0) }
+    ]
+  }
+  """
+```
+
+> **JSON format note**: Symbol system expressions (`$` variables, `&` CAS constraints, `@` time symbols) must NOT be placed inside JSON string quotes `""`, otherwise they are treated as plain strings.
+
+### Escaping Keys Containing `.`
+
+When a JSON key itself contains a `.` character, use `["..."]` bracket notation to prevent it from being split into nested levels:
+
+```gherkin
+Then should exist a setting, with table:
+  | id | content.["btn.save"] | content.["btn.cancel"] |
+  | 1  | Save                 | Cancel                 |
+```
+
+In JSON DocString, use the original key directly — the framework handles escaping automatically.
+
 ## Lookup Strategies
 
 EntityValidate supports three query approaches:

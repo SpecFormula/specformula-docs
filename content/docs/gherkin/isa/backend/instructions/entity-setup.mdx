@@ -50,6 +50,95 @@ Given 準備一個待辦事項, with table:
   | $Alice.id | 買牛奶 |
 ```
 
+## JSON 欄位描述
+
+當 Entity 欄位儲存 JSON 物件（如 PostgreSQL JSONB、MySQL JSON）時，提供兩種方式描述 JSON 欄位內容。
+
+### JSON Path DataTable Header
+
+在 DataTable header 使用路徑語法展開 JSON 結構：
+
+```gherkin
+Given 準備一個訂單, with table:
+  | id | orderItems[0].productId | orderItems[0].quantity | orderItems[1].productId | orderItems[1].quantity |
+  | 1  | 5                       | 2                      | 6                       | 10                     |
+```
+
+等同於壓縮為單行字串的寫法：
+
+```gherkin
+Given 準備一個訂單, with table:
+  | id | orderItems                                                   |
+  | 1  | [{"productId":5,"quantity":2},{"productId":6,"quantity":10}] |
+```
+
+搭配 Symbol System：
+
+```gherkin
+Given 準備一個訂單, with table:
+  | id | orderItems[0].productId | orderItems[0].createdAt |
+  | 1  | $productId              | @time(now)              |
+```
+
+### JSON DocString 格式
+
+使用 `with json:` 搭配 `"""json ... """` 直接撰寫結構化 JSON，適合深層巢狀結構：
+
+```gherkin
+Given 準備一個訂單, with json:
+  """json
+  {
+    "id": 1,
+    "orderItems": [
+      { "productId": 5, "quantity": 2 },
+      { "productId": 6, "quantity": 10 }
+    ]
+  }
+  """
+```
+
+多筆資料使用 JSON Array：
+
+```gherkin
+Given 準備一個訂單明細, with json:
+  """json
+  [
+    { "orderId": 1, "productId": 101, "quantity": 2 },
+    { "orderId": 1, "productId": 102, "quantity": 1 }
+  ]
+  """
+```
+
+搭配 Symbol System：
+
+```gherkin
+Given 準備一個訂單, with json:
+  """json
+  {
+    >orderId: <id,
+    "orderNo": "ORD-001",
+    "createdAt": @time(now),
+    "orderItems": [
+      { "productId": $productId, "quantity": 2 }
+    ]
+  }
+  """
+```
+
+> **JSON 格式注意事項**：符號系統的表達式（`$`變數、`&`CAS 約束、`@`時間符號、`>`/`<`擷取鍵）不可放在 JSON 字串引號 `""` 內，否則會被視為純字串。
+
+### Key 含 `.` 的逃脫語法
+
+當 JSON key 本身包含 `.` 字元時，使用 `["..."]` bracket notation 避免被誤拆為多層巢狀：
+
+```gherkin
+Given 準備一個設定, with table:
+  | id | content.["btn.save"] | content.["btn.cancel"] |
+  | 1  | 儲存                  | 取消                    |
+```
+
+JSON DocString 中直接使用原始 key，框架自動處理逃脫。
+
 ---
 
 ## 與 Entity Spec 的對應關係

@@ -68,9 +68,19 @@ instructions:
     format: ^should exist a (?P<entity>[\w\s]+), with table:$
     instruction_type: entity_validate
 
+  - name: Database validation (JSON)
+    format: ^should exist a (?P<entity>[\w\s]+), with json:$
+    instruction_type: entity_validate
+    data_format: json
+
   - name: Database non-existence validation
     format: ^should not exist a (?P<entity>[\w\s]+), with table:$
     instruction_type: entity_non_existence_validate
+
+  - name: Data preparation (JSON)
+    format: ^prepare a (?P<entity>[\w\s]+), with json:$
+    instruction_type: entity_setup
+    data_format: json
 ```
 
 ## API Configuration
@@ -118,6 +128,32 @@ Fields for each `source` item:
 | `resource_path` | DDL and mapping file path in classpath (required) | — |
 | `project_path` | DDL and mapping file path in project, for Lint (required) | — |
 | `db_type` | Database type: `h2`, `postgresql`, `mysql`, `mssql` | `h2` |
+| `schema` | Default schema for the DataSource connection (optional) | Database default |
+
+### Schema Configuration
+
+The `schema` field is for enterprise multi-schema architectures, specifying the default schema for a DataSource connection:
+
+```yaml
+config:
+  data:
+    source:
+      - name: default
+        resource_path: specs/data
+        db_type: postgresql
+        schema: app_schema       # optional
+```
+
+Database-specific behavior:
+
+| db_type | Schema Behavior | Default Schema |
+|---------|----------------|----------------|
+| `postgresql` | Sets `search_path` to `"<schema>", public` | `public` |
+| `mssql` | Sets connection `DEFAULT_SCHEMA` | `dbo` |
+| `mysql` / `mariadb` | Ignored (schema = database, set via connection URL) | N/A |
+| `h2` | Ignored (embedded test database, no multi-schema routing) | `PUBLIC` |
+
+DDL `CREATE TABLE` statements may include schema prefixes (e.g., `CREATE TABLE dbo.users (...)`). The framework extracts and preserves schema prefixes, using fully-qualified names (`schema.table`) in generated SQL.
 
 ### Folder Structure
 

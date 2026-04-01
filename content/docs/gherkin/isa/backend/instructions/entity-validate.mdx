@@ -74,6 +74,53 @@ Then 應該存在一個待辦事項, with table:
 | `todos` 資料表 | `entity_to_table_mapping` 的 value |
 | `todoId`, `title` 欄位 | DDL 欄位定義 |
 
+## JSON DocString 格式
+
+使用 `with json:` 搭配 `"""json ... """` 驗證 JSON 類型欄位的結構與值：
+
+```gherkin
+Then 應該存在一個訂單, with json:
+  """json
+  {
+    "id": $order1.id,
+    "orderItems": [
+      { "productId": 5, "quantity": 2 },
+      { "productId": 6, "quantity": 10 }
+    ]
+  }
+  """
+```
+
+搭配 Symbol System：
+
+```gherkin
+Then 應該存在一個訂單, with json:
+  """json
+  {
+    "id": $order1.id,
+    "orderNo": &startsWith("ORD-"),
+    "createdAt": &sameTime("2026-01-27T10:00:00"),
+    "orderItems": [
+      { "productId": $productId, "quantity": &gt(0) }
+    ]
+  }
+  """
+```
+
+> **JSON 格式注意事項**：符號系統的表達式（`$`變數、`&`CAS 約束、`@`時間符號）不可放在 JSON 字串引號 `""` 內，否則會被視為純字串。
+
+### Key 含 `.` 的逃脫語法
+
+當 JSON key 本身包含 `.` 字元時，使用 `["..."]` bracket notation 避免被誤拆為多層巢狀：
+
+```gherkin
+Then 應該存在一個設定, with table:
+  | id | content.["btn.save"] | content.["btn.cancel"] |
+  | 1  | 儲存                  | 取消                    |
+```
+
+JSON DocString 中直接使用原始 key，框架自動處理逃脫。
+
 ## 查找策略
 
 EntityValidate 支援三種查詢方式：
