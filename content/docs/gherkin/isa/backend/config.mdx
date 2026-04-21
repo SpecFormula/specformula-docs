@@ -206,11 +206,19 @@ Given 準備一個使用者, with table:
 
 ### 正則表達式與 Gherkin 的對應
 
-`format` 中的正則表達式用於匹配 Gherkin Step 文字，並透過 `(?P<name>...)` 語法擷取參數。以 `api_call` 為例：
+ISA 的指令映射 **不支援 Cucumber Expression**（例如 `{int}`、`{string}`）。
+
+`format` 必須使用 **正則表達式** 完整匹配 Gherkin Step 文字，並透過 **命名擷取群組（named capture group）** 取得參數。
+
+- **Python 寫法**：`(?P<name>...)`
+- **Java/JVM 寫法**：`(?<name>...)`
+
+以 `api_call` 為例：
 
 ```
 Gherkin:  (UID="$Alice.id") 新增待辦事項, call table:
-正則:     ^\((?:No Actor|UID="(?P<userId>...)")\) (?P<summary>.+?), call table:$
+正則（Python）: ^\((?:No Actor|UID="(?P<userId>...)")\) (?P<summary>.+?), call table:$
+正則（Java）:   ^\((?:No Actor|UID="(?<userId>...)")\) (?<summary>.+?), call table:$
 擷取:              userId = $Alice.id      summary = 新增待辦事項
 ```
 
