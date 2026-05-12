@@ -117,7 +117,7 @@ Fields for each `source` item:
 | `name` | Data source name (required) | — |
 | `resource_path` | DDL and mapping file path in classpath (required) | — |
 | `project_path` | DDL and mapping file path in project, for Lint (required) | — |
-| `db_type` | Database type: `h2`, `postgresql`, `mysql`, `mssql` | `h2` |
+| `db_type` | Database type: `embedded`, `postgresql`, `mysql`, `mssql`. `embedded` is a framework-chooses-impl alias (Java→H2, C#→sqlite-style, Python→DuckDB). | `embedded` |
 
 ### Folder Structure
 

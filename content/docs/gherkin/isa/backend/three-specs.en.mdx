@@ -368,7 +368,7 @@ instructions:
 |-------------|-------------|
 | `config.api.resource_path` | API Spec classpath relative path |
 | `config.data.source[]` | Multiple Data Sources supported, each pointing to a set of Entity Spec |
-| `config.data.source[].db_type` | Database type (h2, mssql, postgresql, mysql) |
+| `config.data.source[].db_type` | Database type (embedded, mssql, postgresql, mysql); `embedded` is a framework-chooses-impl alias |
 | `instructions[].format` | Regular expression for instruction, used to match Gherkin steps |
 | `instructions[].instruction_type` | Instruction type, determines execution logic |
 

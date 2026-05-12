@@ -117,7 +117,7 @@ instructions:
 | `name` | 資料源名稱（必填） | — |
 | `resource_path` | DDL 與 mapping 檔案在 classpath 中的路徑（必填） | — |
 | `project_path` | DDL 與 mapping 檔案在專案中的路徑（供 Lint 使用，必填） | — |
-| `db_type` | 資料庫類型：`h2`、`postgresql`、`mysql`、`mssql` | `h2` |
+| `db_type` | 資料庫類型：`embedded`、`postgresql`、`mysql`、`mssql`。`embedded` 為「框架選實作」抽象代名（Java→H2、C#→sqlite-style、Python→DuckDB）。 | `embedded` |
 
 ### 資料夾結構
 
