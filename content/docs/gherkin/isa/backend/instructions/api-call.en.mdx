@@ -54,9 +54,12 @@ DataTable field names support special prefixes to specify parameter types:
 | (none) | Request Body field; if the field name also exists as a Path/Query/Header parameter in the API Spec, it is automatically routed to the matching position (syntax sugar, equivalent to also writing `P:`/`Q:`/`H:`) | `title`, `todoId` |
 | `P:` | Path parameter | `P:todoId` → replaces `{todoId}` in URL |
 | `Q:` | Query parameter | `Q:page` → `?page=value` |
-| `H:` | HTTP Header | `H:X-Trace-Id` |
+| `H:` | Request Header | `H:X-Trace-Id` |
+| `B:` | Explicitly mark entire Request Body (bare value, array, or object) | `B:` → cell value becomes entire body |
 | `>` | Store into variable — defines the variable name to save the response value | `>todo1.id` |
 | `<` | Extract from response — specifies the source field in the response JSON | `<todoId` |
+| `<H:` | Extract from response Header — specifies the source header field | `<H:Location` |
+| `<B:` | Extract from response Body (bare value) — extracts entire response body | `<B:` |
 
 ### JSON Format Prefix Syntax
 
@@ -66,7 +69,8 @@ JSON format uses uppercase letter prefixes with quotes, corresponding to the Dat
 |-----------|------|-------------|
 | `P:todoId` | `P"todoId"` | Path parameter |
 | `Q:page` | `Q"page"` | Query parameter |
-| `H:X-Trace-Id` | `H"X-Trace-Id"` | HTTP Header |
+| `H:X-Trace-Id` | `H"X-Trace-Id"` | Request Header |
+| `B:` | `B:` | Explicitly mark entire Body |
 
 ```gherkin
 # DataTable version
@@ -98,6 +102,36 @@ When (UID="$Alice.id") update todo, call JSON:
 After execution:
 - `todo1.id` = value of `todoId` from response
 - `todo1.title` = value of `title` from response
+
+### Response Header Extraction
+
+Use the `<H:` prefix to extract HTTP Header values from the response:
+
+```gherkin
+# DataTable — extract Location header
+When (No Actor) create resource, call table:
+  | >loc        | name          |
+  | <H:Location | test resource |
+
+# JSON — extract X-Request-Id header
+When (No Actor) create resource, call JSON:
+  """json
+  {
+    >requestId: <H"X-Request-Id",
+    "name": "test resource"
+  }
+  """
+```
+
+### Bare Value Response Body Extraction
+
+When API returns bare values (e.g., `true`, `42`) instead of JSON objects, use `<B:` to extract the entire response body:
+
+```gherkin
+When (No Actor) get resource status, call table:
+  | >result | P:id  |
+  | <B:     | $res1 |
+```
 
 ---
 
@@ -230,6 +264,115 @@ Both produce the same Request Body:
 }
 ```
 
+### Escaping Keys Containing `.`
+
+When a JSON key itself contains a `.` character (e.g., `"btn.save"`), use `["..."]` bracket notation to prevent it from being split into nested levels:
+
+```gherkin
+# DataTable — use bracket notation
+| content.["btn.save"] | content.["btn.cancel"] |
+| Save                 | Cancel                 |
+```
+
+JSON DocString handles escaping automatically during flattening — users write the original key directly:
+
+```gherkin
+# JSON — keys naturally contain ".", framework handles escaping
+"""json
+{
+  "content": {
+    "btn.save": "Save",
+    "btn.cancel": "Cancel"
+  }
+}
+"""
+```
+
+`["..."]` (string key escaping) and `[0]` (array indexing) can coexist in the same path:
+
+```
+data.[0].["field.name"]
+→ data is an object key, [0] is an array index, ["field.name"] is an object key containing "."
+```
+
+## Top-Level Array Body
+
+When the API request body is a top-level array (e.g., batch creation), JSON DocString can use `[...]` directly as the top level:
+
+```gherkin
+When (No Actor) batch create todos, call JSON:
+  """json
+  [
+    { "title": "Buy milk", "priority": 1 },
+    { "title": "Write report", "priority": 2 }
+  ]
+  """
+```
+
+When Path/Query/Header parameters are also needed, keep `{}` as top level and use `B:` to mark the body content:
+
+```gherkin
+When (No Actor) batch create todos, call JSON:
+  """json
+  {
+    P"projectId": $project1.id,
+    Q"notify": "true",
+    B: [
+      { "title": "Buy milk", "priority": 1 },
+      { "title": "Write report", "priority": 2 }
+    ]
+  }
+  """
+```
+
+Equivalent DataTable:
+
+```gherkin
+| P:projectId  | Q:notify | [0].title  | [0].priority | [1].title    | [1].priority |
+| $project1.id | true     | Buy milk   | 1            | Write report | 2            |
+```
+
+`B:` also works for object bodies, providing visual separation between parameters and body (the implicit body rule for non-prefixed keys remains backward-compatible):
+
+```gherkin
+# Implicit body (current syntax, backward-compatible)
+"""json
+{ P"projectId": $project1.id, "title": "Buy milk", "priority": 1 }
+"""
+
+# Explicit B: body (equivalent)
+"""json
+{
+  P"projectId": $project1.id,
+  B: { "title": "Buy milk", "priority": 1 }
+}
+"""
+```
+
+> **Note**: `B:` and non-prefixed keys (e.g., `"name"`) cannot coexist — when using `B:`, the entire body must be inside `B:`.
+
+## Bare Value Body
+
+When the API request body accepts primitive types (`boolean`, `string`, `integer`), use `B:` to mark bare values:
+
+```gherkin
+# DataTable — B: prefix carries bare value
+When toggle resource status, call table:
+  | P:id  | B:   |
+  | $res1 | true |
+
+# JSON — B: carries bare value
+When (No Actor) toggle resource status, call JSON:
+  """json
+  { P"id": $res1, B: true }
+  """
+
+When (No Actor) submit feedback, call JSON:
+  """json
+  { B: "This is feedback" }
+  """
+```
+
 ## Caller Identity
 
 `(UID="...")` specifies the caller identity, and the framework automatically injects the corresponding Bearer Token:
@@ -266,8 +409,47 @@ Time values in ApiCall are automatically converted based on the `time_format` se
 | Error | Description |
 |-------|-------------|
 | Field not found | Field name in DataTable not found in API Spec |
-| Missing required field | Parameter marked as required in OpenAPI not provided |
+| Missing required field | Required parameter marked in OpenAPI is not provided (can be relaxed in specific scenarios with `@allow-missing-parameters`) |
 | Extract field not found | Field specified with `<` not found in Response Schema |
+
+## `@allow-missing-parameters`: Allow Parameter-Validation Preconditions
+
+When your test goal is to verify that the API rejects missing/invalid required parameters, you can add `@allow-missing-parameters` on an Example (or Scenario). This skips the **required-parameter check** for that scenario, while keeping other contract checks enabled.
+
+```gherkin
+Feature: Query API parameter validation
+
+  Rule: Required parameter validation rules
+
+    Example: Should succeed with complete parameters
+      When (UID="$Alice.id") query data, call table:
+        | Q:startDate | Q:endDate  | Q:pageNo | Q:pageSize |
+        | 2024-01-01  | 2024-01-31 | 1        | 10         |
+      Then query data(200) response, with table:
+        | success |
+        | true    |
+
+    @allow-missing-parameters
+    Example: Should fail when required parameter startDate is missing
+      When (UID="$Alice.id") query data, call table:
+        | Q:endDate  | Q:pageNo | Q:pageSize |
+        | 2024-01-31 | 1        | 10         |
+      Then query data(400) response, with table:
+        | errorCode                  |
+        | MISSING_REQUIRED_PARAMETER |
+```
+
+### When to Use
+
+- Missing an OpenAPI required parameter (for example, missing `Q:startDate`)
+- Required parameter value is invalid, and your backend returns a "missing/invalid parameter" type of error
+
+### When Not to Use
+
+- Business rule validation failures (for example, query range exceeds 6 months)
+- Authorization or authentication failures
+- Invalid data state (for example, duplicate request)
+- Parameters are complete and well-formed, but rejected by business logic
 
 ### Runtime
 
