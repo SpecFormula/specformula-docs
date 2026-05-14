@@ -205,11 +205,19 @@ Given prepare a user, with table:
 
 ### Regex to Gherkin Mapping
 
-The `format` regex matches Gherkin Step text and captures parameters using `(?P<name>...)` syntax. For example, with `api_call`:
+ISA instruction mapping does **not** support **Cucumber Expressions** (e.g. `{int}`, `{string}`).
+
+The `format` field must be a **regular expression** that matches the full Gherkin Step text, and captures parameters via **named capture groups**.
+
+- **Python-style named groups**: `(?P<name>...)`
+- **Java/JVM-style named groups**: `(?<name>...)`
+
+For example, with `api_call`:
 
 ```
 Gherkin:  (UID="$Alice.id") create todo, call table:
-Regex:    ^\((?:No Actor|UID="(?P<userId>...)")\) (?P<summary>.+?), call table:$
+Regex (Python): ^\((?:No Actor|UID="(?P<userId>...)")\) (?P<summary>.+?), call table:$
+Regex (Java):   ^\((?:No Actor|UID="(?<userId>...)")\) (?<summary>.+?), call table:$
 Captured:          userId = $Alice.id    summary = create todo
 ```
 
