@@ -387,7 +387,7 @@ instructions:
 |--------|------|
 | `config.api.resource_path` | API Spec 的 classpath 相對路徑 |
 | `config.data.source[]` | 可配置多個 Data Source，每個各自指向一組 Entity Spec |
-| `config.data.source[].db_type` | 資料庫類型（h2, mssql, postgresql, mysql） |
+| `config.data.source[].db_type` | 資料庫類型（embedded, mssql, postgresql, mysql）；`embedded` 為「框架選實作」抽象代名 |
 | `instructions[].format` | 指令的正規表達式，用於匹配 Gherkin 步驟 |
 | `instructions[].instruction_type` | 指令類型，決定執行邏輯 |
 

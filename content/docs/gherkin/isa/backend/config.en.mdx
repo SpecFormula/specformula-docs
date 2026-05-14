@@ -127,13 +127,12 @@ Fields for each `source` item:
 | `name` | Data source name (required) | — |
 | `resource_path` | DDL and mapping file path in classpath (required) | — |
 | `project_path` | DDL and mapping file path in project, for Lint (required) | — |
-| `db_type` | Database type: `h2`, `postgresql`, `mysql`, `mssql` | `h2` |
+| `db_type` | Database type: `embedded`, `postgresql`, `mysql`, `mssql`. `embedded` is a framework-chooses-implementation alias (Java→H2, C#→sqlite-style, Python→DuckDB). | `embedded` |
 | `schema` | Default schema for the DataSource connection (optional) | Database default |
 
 ### Schema Configuration
 
 The `schema` field is for enterprise multi-schema architectures, specifying the default schema for a DataSource connection:
-
 ```yaml
 config:
   data:
@@ -151,7 +150,7 @@ Database-specific behavior:
 | `postgresql` | Sets `search_path` to `"<schema>", public` | `public` |
 | `mssql` | Sets connection `DEFAULT_SCHEMA` | `dbo` |
 | `mysql` / `mariadb` | Ignored (schema = database, set via connection URL) | N/A |
-| `h2` | Ignored (embedded test database, no multi-schema routing) | `PUBLIC` |
+| `embedded` | Ignored (embedded test database, no multi-schema routing; Java implementation uses H2) | `PUBLIC` |
 
 DDL `CREATE TABLE` statements may include schema prefixes (e.g., `CREATE TABLE dbo.users (...)`). The framework extracts and preserves schema prefixes, using fully-qualified names (`schema.table`) in generated SQL.
 

@@ -127,13 +127,12 @@ instructions:
 | `name` | 資料源名稱（必填） | — |
 | `resource_path` | DDL 與 mapping 檔案在 classpath 中的路徑（必填） | — |
 | `project_path` | DDL 與 mapping 檔案在專案中的路徑（供 Lint 使用，必填） | — |
-| `db_type` | 資料庫類型：`h2`、`postgresql`、`mysql`、`mssql` | `h2` |
+| `db_type` | 資料庫類型：`embedded`、`postgresql`、`mysql`、`mssql`。`embedded` 為「框架選實作」抽象代名（Java→H2、C#→sqlite-style、Python→DuckDB）。 | `embedded` |
 | `schema` | 指定 DataSource 連線的預設 schema（選填） | 資料庫預設值 |
 
 ### Schema 設定
 
 `schema` 欄位用於企業級多 schema 架構，指定 DataSource 連線的預設 schema：
-
 ```yaml
 config:
   data:
@@ -151,7 +150,7 @@ config:
 | `postgresql` | 設定 `search_path` 為 `"<schema>", public` | `public` |
 | `mssql` | 設定連線的 `DEFAULT_SCHEMA` | `dbo` |
 | `mysql` / `mariadb` | 忽略（schema 等同於 database，由連線 URL 決定） | N/A |
-| `h2` | 忽略（內嵌測試資料庫，不支援多 schema 路由） | `PUBLIC` |
+| `embedded` | 忽略（內嵌測試資料庫，不支援多 schema 路由；Java 實作使用 H2） | `PUBLIC` |
 
 DDL 中的 `CREATE TABLE` 語句可包含 schema 前綴（如 `CREATE TABLE dbo.users (...)`），框架會擷取並保存 schema 前綴，在生成的 SQL 中使用完整限定名（`schema.table`）。
 
