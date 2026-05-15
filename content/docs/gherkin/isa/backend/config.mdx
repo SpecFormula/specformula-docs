@@ -189,7 +189,40 @@ Given 準備一個使用者, with table:
 | `name` | 指令名稱（用於識別與錯誤訊息） |
 | `format` | 正則表達式，用於匹配 Gherkin Step |
 | `instruction_type` | 對應的 ISA 指令類型 |
-| `data_format` | 資料格式：`data_table`（預設）、`json` |
+| `data_format` | Step payload 格式：`none`、`data_table`、`json`、`text`。省略時依 `instruction_type` 決定預設值。 |
+
+### data_format payload contract
+
+`data_format` 描述 Step 後方是否需要 DataTable 或 DocString，以及 DocString 內容應如何解析。這是 ISA 與各語言 runtime 的共同契約。
+
+| data_format | Payload | 用途 |
+|-------------|---------|------|
+| `none` | 無 payload | 不接 DataTable / DocString 的指令；`custom` 預設為 `none`。 |
+| `data_table` | Gherkin DataTable | 表格型資料準備、API call、回應驗證、Entity 驗證。 |
+| `json` | JSON DocString | JSON body、JSON response expectation、JSON Entity payload。 |
+| `text` | Text DocString | 純文字 payload；若 Step 使用文字 DocString，必須明確設定 `data_format: text`。 |
+
+預設規則：
+
+- 內建 ISA 指令若未指定 `data_format`，預設為 `data_table`。
+- `instruction_type: custom` 若未指定 `data_format`，預設為 `none`，代表 Step Definition 自行決定行為且不由 ISA runtime 解析 payload。
+- JSON DocString 必須設定 `data_format: json`。
+- 純文字 DocString 必須設定 `data_format: text`，避免被誤判成無 payload 或 JSON。
+
+範例：
+
+```yaml
+instructions:
+  - name: Custom log message
+    format: ^記錄訊息:$
+    instruction_type: custom
+    data_format: text
+
+  - name: Custom checkpoint
+    format: ^標記檢查點 (?P<name>.+)$
+    instruction_type: custom
+    # data_format 省略，custom 預設為 none
+```
 
 ### 指令類型對照
 

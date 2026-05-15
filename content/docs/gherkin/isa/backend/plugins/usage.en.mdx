@@ -1,0 +1,78 @@
+---
+title: Use Plugin Instructions
+description: Use an installed plugin's instruction in isa.yml and .isa.feature
+---
+
+After installing and configuring a plugin, the test project usually adds the plugin-provided `instruction_type` to `isa.yml instructions[]`, then writes the matching Step in `.isa.feature`.
+
+## 1. Declare the instruction in isa.yml
+
+```yaml
+plugins:
+  config:
+    audit:
+      tag: ecommerce
+
+instructions:
+  - name: Audit log
+    format: '^record audit:$'
+    instruction_type: audit_log
+    data_format: text
+```
+
+Key points:
+
+- `instruction_type` must be one of the values listed by the plugin documentation.
+- `format` is the pattern matched by Step text in `.isa.feature`.
+- If the Step needs a DocString or DataTable, set `data_format` according to the plugin documentation.
+- If the plugin instruction does not need payload, `data_format` can be omitted; the effective value is `none`.
+
+## 2. Use the Step in .isa.feature
+
+```gherkin
+Then record audit:
+  """
+  item created
+  """
+```
+
+At runtime, SpecFormula matches the Step using `format`, verifies that the plugin supports the configured `data_format`, then passes the payload to the plugin.
+
+## Choosing data_format
+
+| payload | `data_format` |
+|---------|---------------|
+| No payload | `none` or omitted |
+| DataTable | `data_table` |
+| JSON DocString | `json` |
+| Plain text DocString | `text` |
+
+`data_format` is the payload contract for the plugin instruction. If the plugin documentation says `audit_log` only supports `text` but `isa.yml` says `data_table`, startup should fail.
+
+## JSON event validation example
+
+```yaml
+plugins:
+  config:
+    event:
+      topic: order-events
+      mode: strict
+
+instructions:
+  - name: Payment event should be published
+    format: '^payment event should be published JSON:$'
+    instruction_type: event_validate
+    data_format: json
+```
+
+```gherkin
+Then payment event should be published JSON:
+  """json
+  {
+    "eventType": "ORDER_PAID",
+    "orderId": "$LastOrder.id"
+  }
+  """
+```
+
+If you do not want to use this plugin's debug instruction or selected `lifecycle_hooks`, go back to [Plugin Configuration](/docs/gherkin/isa/backend/plugins/configuration) and configure `disabled`.

@@ -1,0 +1,80 @@
+---
+title: Java / Maven
+description: Adopt SpecFormula with Maven and Cucumber JVM
+---
+
+The Java implementation is split into Maven modules:
+
+| Module | Purpose |
+|--------|---------|
+| `specformula-core` | ISA parser, instruction engine, and symbol systems. |
+| `specformula-spring` | Spring bridge, ScenarioContext, HTTP/auth/time adapters. |
+| `specformula-cucumber` | Cucumber Backend SPI integration. |
+| `specformula-testcontainer` | Testcontainers database setup and cleanup. |
+| `specformula-dsl` | DSL preprocessing Maven plugin. |
+
+## Development install
+
+Install Java modules into the local Maven repository from this repo:
+
+```bash
+cd specformula-java
+mvn clean install -DskipTests
+```
+
+## Test project dependencies
+
+A minimal Cucumber setup usually needs:
+
+```xml
+<dependencies>
+  <dependency>
+    <groupId>ai.specformula</groupId>
+    <artifactId>specformula-cucumber</artifactId>
+    <version>${specformula.version}</version>
+    <scope>test</scope>
+  </dependency>
+
+  <dependency>
+    <groupId>ai.specformula</groupId>
+    <artifactId>specformula-testcontainer</artifactId>
+    <version>${specformula.version}</version>
+    <scope>test</scope>
+  </dependency>
+</dependencies>
+```
+
+`specformula-cucumber` is loaded through Cucumber Backend SPI; test execution remains standard Cucumber / JUnit Platform.
+
+## Enable DSL preprocessing
+
+If the test project uses `.dsl.feature`, add the `specformula-dsl` Maven plugin. The plugin runs in `generate-test-sources`: it reads the source tree, writes generated test resources, and does not modify build output in place.
+
+```xml
+<build>
+  <plugins>
+    <plugin>
+      <groupId>ai.specformula</groupId>
+      <artifactId>specformula-dsl</artifactId>
+      <version>${specformula.version}</version>
+      <executions>
+        <execution>
+          <goals>
+            <goal>preprocess</goal>
+          </goals>
+        </execution>
+      </executions>
+    </plugin>
+  </plugins>
+</build>
+```
+
+If you need Cucumber failures to trace back to DSL source, add the current test-time support from `specformula-dsl` as implemented in the repo.
+
+## Run tests
+
+```bash
+mvn test
+```
+
+

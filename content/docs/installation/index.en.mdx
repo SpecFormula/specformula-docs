@@ -1,0 +1,38 @@
+---
+title: Installation and Setup
+description: Entry guide for adopting SpecFormula in Java and C# projects
+---
+
+SpecFormula's specification layer is shared across languages: `isa.yml`, OpenAPI specs, DDL/mapping files, `.isa.feature`, and `.dsl.feature` should keep the same semantics. Language packages connect those specs to each BDD runtime and test framework.
+
+## Choose your stack
+
+| Stack | BDD runtime | Build tool | Guide |
+|-------|-------------|------------|-------|
+| Java | Cucumber JVM | Maven | [Java / Maven](/docs/installation/java) |
+| C# | Reqnroll | .NET SDK / MSBuild | [C# / Reqnroll](/docs/installation/csharp) |
+
+## Shared test resources
+
+Regardless of language, a test project usually needs these files:
+
+```text
+MyProject.Tests/
+├── Features/
+│   ├── *.isa.feature        # ISA Gherkin feature
+│   └── *.dsl.feature        # Optional: SpecFormula DSL source
+├── specs/
+│   ├── api/api-spec.yml     # OpenAPI
+│   └── data/
+│       ├── schema.sql
+│       └── entity_to_table_mapping.yml
+├── isa.yml                  # ISA runtime configuration
+└── dsl.yml                  # Optional: DSL phrase / composition configuration
+```
+
+## Package status
+
+This documentation currently follows the development repository layout:
+
+- Java uses Maven modules / local Maven install.
+- C# uses ProjectReference. Once official NuGet packages and release flow are finalized, this page should be updated with `dotnet add package` commands.

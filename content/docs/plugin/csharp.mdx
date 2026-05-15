@@ -1,0 +1,98 @@
+---
+title: C# Plugin 開發
+description: 使用 assembly scanning 建立 C# / .NET / Reqnroll 的 SpecFormula Plugin
+---
+
+C# Plugin 使用 runtime assembly scanning。Plugin 作者負責讓公開 plugin class 實作 `ISpecFormulaPlugin`，並提供 public parameterless constructor；使用者只需要把 plugin package 或 project reference 加進測試專案。
+
+## 適用範圍
+
+本頁適用於：
+
+- 建立可被多個 C# 測試專案重用的 plugin assembly。
+- 提供新的 `instruction_type`。
+- 提供 `lifecycle_hooks` 或 `spec_readers`。
+- 維護 C# / Reqnroll implementation 的內建 plugin。
+
+## 專案依賴
+
+開發 plugin 時依賴 `SpecFormula.PluginApi`：
+
+```xml
+<ItemGroup>
+  <ProjectReference Include="..\SpecFormula.PluginApi\SpecFormula.PluginApi.csproj" />
+</ItemGroup>
+```
+
+發布後可改由 NuGet package 提供相同 API dependency。
+
+## Discovery 規則
+
+C# runtime 會掃描測試輸出與目前 AppDomain 中的 assemblies。Plugin class 應符合：
+
+- public concrete class。
+- 實作 `ISpecFormulaPlugin`。
+- 提供 public parameterless constructor。
+- assembly 會被複製到 test output。
+
+## Plugin class
+
+```csharp
+using SpecFormula.PluginApi;
+
+public sealed class AuditPlugin : ISpecFormulaPlugin
+{
+    private string _tag = "default";
+
+    public string Id => "audit";
+    public string Version => "1.0.0";
+
+    public void Configure(IPluginContext ctx)
+    {
+        if (ctx.PluginConfig.TryGetValue("tag", out var raw) && raw is string value)
+        {
+            _tag = value;
+        }
+    }
+
+    public IReadOnlyList<IInstruction> Instructions()
+        => [new AuditLogInstruction(_tag)];
+}
+```
+
+## 使用者端 csproj
+
+使用者加入 package 或 project reference 後，plugin assembly 必須出現在 test output：
+
+```xml
+<ItemGroup>
+  <ProjectReference Include="../Example.SpecFormula.AuditPlugin/Example.SpecFormula.AuditPlugin.csproj" />
+</ItemGroup>
+```
+
+純 SpecFormula plugin 通常不需要額外 Reqnroll step assembly 設定；若 plugin 同時提供原生 Reqnroll Step Definition，才需要依 Reqnroll 規則設定。
+
+## 使用者端 isa.yml
+
+Plugin 作者應在文件中明確列出 plugin id、可用 instruction type、支援的 data format，以及可停用的 contribution 名稱。
+
+```yaml
+plugins:
+  config:
+    audit:
+      tag: ecommerce
+
+instructions:
+  - name: 記錄 audit
+    format: '^記錄 audit:$'
+    instruction_type: audit_log
+    data_format: text
+```
+
+## 驗證重點
+
+- plugin assembly 已複製到 test output。
+- plugin class 是 public concrete class，且有 public parameterless constructor。
+- `Id` 與使用者 `plugins.config.<id>` 一致。
+- `Instructions()` 回傳的 instruction type 不與其他 plugin 衝突。
+- `disabled.instructions` / `disabled.lifecycle_hooks` / `disabled.spec_readers` 名稱與 plugin 實際提供的 contribution 名稱一致。

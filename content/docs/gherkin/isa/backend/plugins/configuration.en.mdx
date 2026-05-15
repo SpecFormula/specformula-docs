@@ -1,0 +1,125 @@
+---
+title: Plugin Configuration
+description: Configure and disable installed plugin features using isa.yml plugins.config
+---
+
+User-facing plugin configuration lives under top-level `plugins.config` in `isa.yml`. Each plugin defines its own plugin id and option fields; use the schema provided by the plugin documentation.
+
+## Basic format
+
+```yaml
+plugins:
+  config:
+    audit:
+      tag: ecommerce
+      mode: strict
+```
+
+In this example:
+
+- `audit` is the plugin id.
+- `tag` and `mode` are options defined by that plugin.
+- SpecFormula passes `plugins.config.audit` to the `audit` plugin during startup.
+
+## Configure a plugin instruction
+
+`plugins.config` configures the plugin itself. To use a plugin-provided Step in `.isa.feature`, also reference the plugin `instruction_type` in `instructions[]`:
+
+```yaml
+plugins:
+  config:
+    audit:
+      tag: ecommerce
+      mode: strict
+
+instructions:
+  - name: Audit log
+    format: '^record audit:$'
+    instruction_type: audit_log
+    data_format: text
+```
+
+## Disable plugin instructions
+
+If a plugin provides multiple instructions and the test project only wants some of them, disable the unused instructions:
+
+```yaml
+plugins:
+  config:
+    audit:
+      disabled:
+        instructions:
+          - audit_debug
+          - audit_dump_context
+```
+
+After disabling:
+
+- `audit_debug` and `audit_dump_context` are not registered.
+- If `instructions[]` still references a disabled `instruction_type`, startup should fail.
+- If a disabled name is misspelled, startup should fail instead of silently doing nothing.
+
+## Disable lifecycle_hooks
+
+Some plugins provide `lifecycle_hooks` to handle external resources around test execution, such as resetting Redis state, clearing mock server state, preparing event topics, or producing test reports.
+
+If the plugin documentation lists disableable lifecycle hook names, disable them under `disabled.lifecycle_hooks`:
+
+```yaml
+plugins:
+  config:
+    redis:
+      uri: redis://localhost:6379
+      key_prefix: test:
+      disabled:
+        lifecycle_hooks:
+          - redis_state_reset
+```
+
+Common reasons:
+
+- Preserve external state during local debugging.
+- Use the plugin instructions in CI but disable selected lifecycle hooks from the same plugin.
+- Delegate the lifecycle hook effect to another environment mechanism, such as test container reset or a separate teardown job.
+
+Be careful: disabling a lifecycle hook can change test isolation, resource reset, or report generation behavior. If you disable one in CI, make sure another replacement mechanism exists.
+
+## Disable other plugin features
+
+If the plugin documentation lists other disableable items, use the documented names. For example:
+
+```yaml
+plugins:
+  config:
+    audit:
+      disabled:
+        spec_readers:
+          - audit_catalog
+```
+
+Most test projects only need to disable `instructions` or `lifecycle_hooks`. If you are not sure what a lower-level item does, avoid setting it.
+
+## Override built-in behavior
+
+If a third-party plugin overrides a built-in instruction, it must be explicitly allowed:
+
+```yaml
+plugins:
+  config:
+    custom-http:
+      override_builtin: true
+```
+
+This prevents third-party plugins from accidentally changing built-in behavior. Regular plugin users should not set it unless the plugin documentation explicitly requires it.
+
+## Common errors
+
+| Symptom | Fix |
+|---------|-----|
+| `plugins.config.<id>` has no matching plugin | Confirm the plugin package is installed and the plugin id matches the documentation. |
+| Disabled instruction / lifecycle hook does not exist | Fix the `disabled.*` name or confirm the current plugin version supports it. |
+| A disabled `instruction_type` is still used | Remove the disabled setting or use another instruction. |
+| Tests contaminate each other or reports disappear after a lifecycle hook is disabled | Re-enable that lifecycle hook or provide another isolation/cleanup/reporting mechanism. |
+| Built-in override fails | Add `override_builtin: true` only if you intentionally override built-in behavior. |
+
+Next: go to [Use Plugin Instructions](/docs/gherkin/isa/backend/plugins/usage) and write the plugin instruction in `.isa.feature`.

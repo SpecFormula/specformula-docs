@@ -1,0 +1,47 @@
+---
+title: Plugin 配置指南
+description: 在測試專案中配置、啟用與停用 SpecFormula Plugin 功能
+---
+
+Plugin 文件對一般使用者的重點是「怎麼配置已安裝的 plugin」，而不是怎麼開發 plugin。
+
+你通常會在三個地方碰到 plugin：
+
+| 位置 | 你要做什麼 |
+|------|------------|
+| `pom.xml` / `.csproj` | 把 plugin 套件加入測試專案。 |
+| `isa.yml plugins.config` | 設定 plugin id、plugin 參數、停用項目。 |
+| `isa.yml instructions[]` | 使用 plugin 提供的 `instruction_type`。 |
+
+## 使用流程
+
+```text
+加入 plugin 套件
+      │
+      ▼
+在 isa.yml plugins.config.<plugin_id> 放設定
+      │
+      ▼
+需要時停用 plugin 提供的部分功能
+      │
+      ▼
+在 instructions[] 使用 plugin instruction_type
+      │
+      ▼
+在 .isa.feature 使用對應 Step
+```
+
+## 常見配置情境
+
+- 設定 plugin 連線資訊，例如 endpoint、topic、queue、bucket、namespace。
+- 設定 plugin 執行模式，例如 `strict` / `lenient`。
+- 停用某些 plugin instruction，例如只保留正式驗證指令，不使用 debug 指令。
+- 停用某些 `lifecycle_hooks`，例如本機除錯時暫時保留外部資源狀態。
+- 明確允許 plugin 覆蓋內建功能。
+
+## 下一步
+
+- [安裝 Plugin](/docs/gherkin/isa/backend/plugins/installation)
+- [配置 plugins.config](/docs/gherkin/isa/backend/plugins/configuration)
+- [使用 Plugin Instruction](/docs/gherkin/isa/backend/plugins/usage)
+

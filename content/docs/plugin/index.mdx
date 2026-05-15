@@ -1,0 +1,25 @@
+---
+title: Plugin 開發
+description: 依語言選擇 Java 或 C# 的 SpecFormula Plugin 開發指南
+---
+
+Plugin 開發文件依語言區分。Plugin 的概念契約是跨語言一致的，但 discovery、package 佈局、BDD runtime 整合與測試方式會依語言不同。
+
+## 選擇語言
+
+<Cards>
+  <Card title="Java / Maven / Cucumber JVM" href="/docs/plugin/java" />
+  <Card title="C# / .NET / Reqnroll" href="/docs/plugin/csharp" />
+</Cards>
+
+## 共通契約
+
+無論哪個語言，Plugin 都圍繞同一組配置與 contribution 名稱：
+
+- plugin id：對應 `isa.yml plugins.config.<id>`。
+- `instructions`：提供新的 `instruction_type`。
+- `lifecycle_hooks`：提供可在測試執行前後觸發的 hook。
+- `spec_readers`：提供額外 spec kind 的 reader。
+- `disabled.instructions` / `disabled.lifecycle_hooks` / `disabled.spec_readers`：使用者可在 `isa.yml` 停用個別 contribution。
+
+實作細節請進入對應語言頁。

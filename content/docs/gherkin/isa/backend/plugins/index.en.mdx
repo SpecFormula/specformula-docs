@@ -1,0 +1,47 @@
+---
+title: Plugin Configuration Guide
+description: Configure, enable, and disable SpecFormula Plugin features in a test project
+---
+
+For regular users, Plugin documentation should focus on how to configure an installed plugin, not how to develop one.
+
+You usually touch plugins in three places:
+
+| Location | What you do |
+|----------|-------------|
+| `pom.xml` / `.csproj` | Add the plugin package to the test project. |
+| `isa.yml plugins.config` | Configure the plugin id, plugin options, and disabled items. |
+| `isa.yml instructions[]` | Use `instruction_type` values provided by the plugin. |
+
+## Usage flow
+
+```text
+Add plugin package
+      │
+      ▼
+Configure isa.yml plugins.config.<plugin_id>
+      │
+      ▼
+Disable selected plugin features if needed
+      │
+      ▼
+Use plugin instruction_type in instructions[]
+      │
+      ▼
+Use the matching Step in .isa.feature
+```
+
+## Common configuration tasks
+
+- Configure connection values such as endpoint, topic, queue, bucket, or namespace.
+- Configure plugin mode, such as `strict` / `lenient`.
+- Disable selected plugin instructions, for example keeping production validation instructions but disabling debug instructions.
+- Disable selected `lifecycle_hooks`, for example when preserving external state during local debugging.
+- Explicitly allow a plugin to override a built-in instruction.
+
+## Next steps
+
+- [Install Plugin](/docs/gherkin/isa/backend/plugins/installation)
+- [Configure plugins.config](/docs/gherkin/isa/backend/plugins/configuration)
+- [Use Plugin Instructions](/docs/gherkin/isa/backend/plugins/usage)
+

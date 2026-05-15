@@ -1,0 +1,61 @@
+---
+title: Install Plugin
+description: Add a SpecFormula Plugin package to a Java or C# test project
+---
+
+A plugin should be distributed as a package. Users only need to add the plugin package to the test project so it appears on the test runtime classpath / assembly load path.
+
+This page only explains how to install a plugin into a test project. Plugin parameters and disable rules belong in `isa.yml plugins.config`.
+
+## Java / Maven
+
+Add the plugin JAR to the test classpath:
+
+```xml
+<dependency>
+  <groupId>com.example</groupId>
+  <artifactId>specformula-audit-plugin</artifactId>
+  <version>1.0.0</version>
+  <scope>test</scope>
+</dependency>
+```
+
+If the plugin is a Maven module in the same multi-module repo, the test module can depend on it directly:
+
+```xml
+<dependency>
+  <groupId>com.example</groupId>
+  <artifactId>my-local-specformula-plugin</artifactId>
+  <version>${project.version}</version>
+  <scope>test</scope>
+</dependency>
+```
+
+Regular users do not need to manually create Java discovery metadata; the plugin JAR should package it.
+
+## C# / .NET
+
+Published plugins are usually installed as NuGet packages:
+
+```bash
+dotnet add MyProject.Tests package Example.SpecFormula.AuditPlugin
+```
+
+A local plugin under development can use `ProjectReference`:
+
+```xml
+<ItemGroup>
+  <ProjectReference Include="../Example.SpecFormula.AuditPlugin/Example.SpecFormula.AuditPlugin.csproj" />
+</ItemGroup>
+```
+
+The test project still needs the SpecFormula Reqnroll integration. A third-party SpecFormula plugin assembly only needs to be present in the test output / load path so the runtime can load it.
+
+## Post-install checklist
+
+1. The plugin package is in the test project's dependency graph.
+2. The plugin JAR / assembly appears on the test runtime classpath or output folder.
+3. The plugin documentation provides a plugin id, for example `audit`.
+4. The plugin documentation lists available `instruction_type` values, supported `data_format` values, and configurable/disableable items.
+
+Next: go to [Plugin Configuration](/docs/gherkin/isa/backend/plugins/configuration) and add the plugin id and options to `isa.yml`.
