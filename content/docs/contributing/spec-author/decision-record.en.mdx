@@ -1,0 +1,100 @@
+---
+title: Decision Record (ADR)
+description: The five-part structure of a global ADR (how to write each part), scope triage, template, and anti-pattern.
+---
+
+A global ADR records a cross-language spec / architecture decision, **language-neutral with no implementation**. An ADR is immutable — to revise a decision, write a new ADR that supersedes it. Template: `specs/adr/0000-adr-template.md`.
+
+## Structure
+
+An ADR has five parts. The purpose and how to write each:
+
+### Context
+
+**What it is**: the background and current state — why this ADR is needed now. State facts and constraints only, no solution.
+
+**How to write it well**: lead with the current pain point; list only the facts, existing specs, and constraints relevant to this decision; state them neutrally. After the first paragraph the reader should know why the ADR exists.
+
+**Avoid**: a one-line summary, smuggling in the solution, padding with unrelated background.
+
+**Reference**: `specs/adr/0017`'s Context uses two parts — first the monorepo multi-language structure, then the pain of "Java detail mixed into global ADRs" — with no solution anywhere.
+
+### Problem
+
+**What it is**: the specific problem to solve under this Context. Focus on one.
+
+**How to write it well**: write a checkable, concrete statement — "X is currently impossible", "Y is inconsistent across languages", "Z is undefined". One sentence should capture the core.
+
+**Avoid**: a vague wish ("improve the experience"), a solution disguised as a problem.
+
+**Reference**: `0017`'s Problem lists three concrete problems (tight coupling of spec and implementation, global information pollution, blurred maintenance responsibility); `0021` numbers them (no executable verification, Java-term coupling, no unified conformance baseline).
+
+### Forces
+
+**What it is**: the forces that make the problem hard — competing trade-offs, constraints, and needs (at least 3). They become the criteria for evaluating options.
+
+**How to write it well**: list the conflicting concerns, e.g. "spec consistency vs language autonomy", "strictness vs readability", "backward compatibility vs simplicity"; for each, say how it bears on this decision. If nothing conflicts, they are not forces.
+
+**Avoid**: listing only upsides, omitting the conflicting side, writing a plain requirements list.
+
+**Reference**: `0017`'s Forces lists four competing facets (spec purity / architectural consistency / implementation autonomy / traceability); `0023` lists five (test-standard consistency, minimal implementation bar, compatibility with existing architecture, controllable DB state, cross-process control).
+
+### Solution
+
+**What it is**: the chosen solution. Language-neutral syntax / semantics / error contract.
+
+**How to write it well**: concrete enough to implement — EBNF grammar, argument rules, error contract, boundary behavior; broken into sections (structure, naming, rules); state how it balances the Forces above. Write no library or type of any language (that belongs in a project ADR).
+
+**Avoid**: giving direction without rules, mixing in language implementation detail, being disconnected from the Forces (not answering the trade-offs listed).
+
+**Reference**: `0017`'s Solution uses "summary + design", with the design split into sections (structure & path, numbering & naming, variance declaration, review & governance), each with concrete rules (paths, prefix table, format), fully language-neutral.
+
+### Resulting Context
+
+**What it is**: the outcome of adopting the solution — benefits, costs, new constraints, and follow-up work.
+
+**How to write it well**: list Pros / Cons honestly; call out new constraints, migration costs, to-dos; link to a tracking issue when relevant.
+
+**Avoid**: writing "none" for Cons (a red flag — the trade-offs were not considered), reporting only the upside.
+
+**Reference**: `0017`'s Resulting Context splits Pros (4) / Cons (2), with Cons concretely stating "lookup chain" and "maintenance cost"; it also lists two rejected alternatives, each with Pros / Cons.
+
+## Scope triage (before writing)
+
+| What you are deciding | Which layer |
+|---|---|
+| New syntax / symbol / instruction / cross-language semantics | Global ADR (this page) |
+| A language-specific implementation choice (lib, toolchain, performance, workaround) | Project ADR (see [implementer/writing-project-adr](/docs/contributing/implementer/writing-project-adr)) |
+| Unsure | Open a Discussion first |
+
+Criteria follow `specs/adr/0017-hierarchical-adr-system.md` §4. If you find a spec defect during implementation, take the Spec-First Correction path: fix the global spec, do not patch it privately in a project ADR.
+
+## Template
+
+Always start from `specs/adr/0000-adr-template.md`; for overall style refer to `specs/adr/0017-hierarchical-adr-system.md` (per-section detail is in the "Reference" notes above). Do not copy a legacy ADR that carries Java detail (such as `0005`).
+
+## Anti-pattern (illustrative)
+
+```markdown
+# NNNN-add-retry-mechanism
+
+# Context
+APIs sometimes fail; we should retry.
+
+# Solution
+Add a @retry instruction. Java uses Spring Retry, Python tenacity, TS axios-retry.
+
+# Resulting Context
+- Pros: convenient
+- Cons: none
+```
+
+Problems: Context too short, no Problem / Forces; `@` is the TIME symbol prefix and cannot name an instruction (instructions are kebab-case); the Solution mixes in language libraries, breaking language neutrality; "none" for Cons means the trade-offs were not considered.
+
+## Common traps
+
+| Trap | How to avoid |
+|---|---|
+| Skipping Forces | List at least 3 forces |
+| Language-specific Solution | Global ADRs describe language-neutral behavior; implementation detail goes in project ADRs |
+| Thin Alternatives | At least one rejected option with its reason |

@@ -1,0 +1,48 @@
+---
+title: Label System
+description: The labels specformula-dev-framework actually uses on GitHub, and the triage convention.
+---
+
+These are the labels currently configured on the repo (`gh label list`). Language uses the `lang:` prefix; the rest are a flat set of type / status labels — there is no `T-` / `A-` axis.
+
+## Language implementations
+
+| Label | Maps to |
+|---|---|
+| `lang:Java` | `specformula-java` (Reference Implementation) |
+| `lang:Python` | `specformula-python` |
+| `lang:CSharp` | `specformula-csharp` |
+| `lang:TypeScript` | `specformula-ts` |
+| `lang:Rust` | Rust (currently a benchmark target only) |
+
+## Type
+
+| Label | Meaning |
+|---|---|
+| `bug` | behavior is not as expected |
+| `enhancement` | new feature / improvement |
+| `documentation` | docs |
+| `architecture` | key architectural decisions and records (ADR-like) |
+| `benchmark` | a new benchmark |
+| `release` | release / deployment |
+| `testing` | add or fix tests |
+
+## Status / workflow
+
+| Label | Meaning |
+|---|---|
+| `Draft` | not yet a fully filed proposal |
+| `good first issue` | suitable for newcomers |
+| `help wanted` | needs more hands |
+| `question` | needs more information |
+| `duplicate` / `invalid` / `wontfix` | GitHub built-in dispositions |
+
+## Labels applied by issue templates
+
+When an issue is opened, the template's `labels:` field pre-applies the relevant label plus `needs-triage` (bug → `bug`, spec/feature proposal → `proposal`, docs → `documentation`, CI/release → `ci` + `release`, architecture refactor → `refactoring` + `architecture`). Of these, `needs-triage` / `proposal` / `ci` / `refactoring` must be created as labels if the repo does not have them yet. See [issue-templates](/docs/contributing/reference/issue-templates).
+
+## Triage convention
+
+1. When an issue comes in, a maintainer adds the language (`lang:`) and type labels as appropriate, and removes `needs-triage`.
+2. Duplicate or known → tag `duplicate`, link back to the original, then close.
+3. Entry difficulty uses GitHub's built-in `good first issue`.

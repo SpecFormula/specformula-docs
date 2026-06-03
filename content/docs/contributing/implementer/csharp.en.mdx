@@ -1,0 +1,72 @@
+---
+title: C# Implementation
+description: specformula-csharp frameworks, architecture, directory layout, and project ADRs.
+---
+
+`specformula-csharp` is a multi-target .NET solution (net8 + net10), with Reqnroll for BDD. Syncing features and benchmark acceptance are shared steps across languages — see the [Implementer entry](/docs/contributing/implementer).
+
+## Overview
+
+- Four-layer module structure (`csharp-0001`): `SpecFormula.Core` (execution core), `SpecFormula.PluginApi` (contract), `SpecFormula.Reqnroll` (BDD), `SpecFormula.AspNetCore` (web adapter); plus `SpecFormula.Testcontainers` and `SpecFormula.Dsl` (build-time tool).
+- Framework dependencies: Reqnroll 3 + xUnit 2, YamlDotNet 16, Testcontainers for .NET 4, `Microsoft.Extensions.DependencyInjection`, `System.Text.Json`.
+
+## Architecture
+
+- **Plugin**: Reqnroll `IRuntimePlugin` (`csharp-0003`).
+- **DI**: `Microsoft.Extensions.DependencyInjection` (not Spring); the Bridge is a manual Singleton.
+- **Reqnroll hook order**: 0 (read spec, init Bridge) → 10 (start containers) → 100 (user config); a missing `stepAssemblies` in `reqnroll.json` silently skips hooks.
+- **Multi-target**: libraries ship both net8 / net10.
+
+## Directory layout
+
+```
+specformula-csharp/
+└─ src/
+   ├─ SpecFormula.Core/         # Instruction / SymbolSystem / Spec
+   ├─ SpecFormula.PluginApi/
+   ├─ SpecFormula.Reqnroll/     # IsaStepHandler partials, Hooks
+   ├─ SpecFormula.AspNetCore/   # web adapter
+   ├─ SpecFormula.Testcontainers/
+   └─ SpecFormula.Dsl/          # build-time DSL tool
+```
+
+| Spec concept | Location (prefix `src/SpecFormula.Core/`) |
+|---|---|
+| Instructions (api-call, entity-setup, time-control…) | `Instruction/` (`ApiCall.cs`, `TimeControl.cs`…) |
+| Symbol system | `SymbolSystem/`: `VarSystem.cs` (VAR `$` `>` `<`), `CasSystem.cs` (CAS `&`), `TimeSystem.cs` (TIME `@`) |
+| Spec readers | `Spec/` (`Isa/IsaSpecReader.cs`, `Api/ApiSpecReader.cs`, `Data/EntityDdlReader.cs`) |
+| BDD stepdefs / hooks | `src/SpecFormula.Reqnroll/` (`IsaStepHandler.cs` and partials, `Hooks/`) |
+
+## Environment setup
+
+- .NET SDK 8.0 + 10.0 (multi-target net8 / net10 — install both).
+- Docker or a compatible container runtime: required by Testcontainers.
+
+## Build and test
+
+```bash
+dotnet restore specformula-csharp/specformula-csharp.sln --locked-mode
+dotnet build   specformula-csharp/specformula-csharp.sln -c Release --no-restore
+dotnet test    specformula-csharp/specformula-csharp.sln -c Release
+```
+
+Lint / format is not configured (`Nullable` is on).
+
+## Gotchas
+
+- Time: `TIMESTAMPTZ` converts to UTC (`DateTimeKind.Utc`), plain `TIMESTAMP` to `Unspecified`.
+- Reqnroll hooks have an Order; a missing `stepAssemblies` silently skips them.
+- DI via `Microsoft.Extensions.DependencyInjection`; the Bridge is a manual Singleton.
+
+## Project ADRs
+
+Under `specformula-csharp/specs/adr/`, prefix `csharp-`:
+
+| ADR | Topic |
+|---|---|
+| `csharp-0001` | Infrastructure and dependency architecture (incl. .NET 10 LTS, Reqnroll choice) |
+| `csharp-0002` | DSL compilation layer (in-place overwrite) |
+| `csharp-0003` | Plugin architecture |
+| `csharp-0004` | NuGet publishing strategy (lock file, OIDC) |
+
+How to write them: [writing-project-adr](/docs/contributing/implementer/writing-project-adr).

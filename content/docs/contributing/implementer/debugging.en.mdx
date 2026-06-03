@@ -1,0 +1,53 @@
+---
+title: Cross-Implementation Debugging
+description: Failure mode taxonomy, a decision tree for distinguishing spec problems from implementation bugs, and how to report spec ambiguities.
+---
+
+When a benchmark shows cross-implementation divergence, or a language implementation behaves unexpectedly, this page is the hands-on starting point: classify the failure, decide whether it is a spec issue or an implementation issue, and file a spec ambiguity report. The authoritative triage rules and ownership live in [cross-impl-policy](/docs/contributing/implementer/cross-impl-policy).
+
+## Failure mode taxonomy
+
+| Category | Symptom | First step |
+|---|---|---|
+| Spec ambiguity | Multiple implementations deviate from the spec reference in the same direction | Read the global ADR and feature file; identify the ambiguous point; may require Spec-First Correction |
+| Single-implementation bug | Only one language implementation fails | That language's maintainer investigates; confirm the spec case is well-formed |
+| Environment issue | Same implementation behaves differently on CI vs. locally | Check toolchain version; verify time / timezone / locale configuration |
+| Adapter / target service issue | All implementations fail on a single domain | Check whether the benchmark domain's target service is healthy |
+
+## Decision tree: spec problem or implementation problem?
+
+```text
+benchmark fails
+├─ Multiple implementations failing?
+│  ├─ Yes → likely a spec problem (including ambiguous feature file)
+│  │     → read the global ADR + feature file; check that the spec is unambiguous
+│  │     → if spec is ambiguous: Spec-First Correction
+│  │     → if spec is clear: multiple implementations may have the same bug; fix each independently
+│  └─ No (single implementation fails) → bug in that implementation, or a justified deviation
+│        ├─ Spec is clear → bug; the language maintainer fixes it
+│        └─ Spec does not apply to this language → write a project ADR to record the deviation
+```
+
+Once you have classified the category, which process to follow and who owns it is governed by the [cross-impl-policy triage](/docs/contributing/implementer/cross-impl-policy) — this page only diagnoses down to "spec vs. implementation". When there is a divergence, do not use RI behavior as the deciding baseline (the RI may have made incorrect assumptions where the spec is underspecified; passing all tests does not guarantee correctness); see [Reference Implementation](/docs/contributing/implementer).
+
+## Reporting spec ambiguity
+
+When a spec ambiguity (rather than an implementation bug) is confirmed, use the appropriate issue template:
+
+- Implementation behaviors clearly diverge and the spec wording is ambiguous → use the `spec_or_feature_proposal` template (this follows the Spec-First Correction process)
+- A single implementation's behavior is definitively a bug → use the `bug_report` template
+
+Recommended issue content:
+
+- Title: `[spec ambiguity] {scenario name}`
+- Required: which implementations are inconsistent, the observed behavior of each, and the current global ADR and feature file's description of the scenario (quote directly)
+- Suggested clarification direction (optional, but helpful for moving discussion forward)
+
+See [reference/issue-templates](/docs/contributing/reference/issue-templates).
+
+## Tips for writing a minimal reproduction
+
+- Keep only the minimum scenario that triggers the problem; remove unrelated Given / When steps.
+- Use real instructions and symbols (`api-call`, `entity-setup`, `entity-validate`, `time-control`; VAR `$`, CAS `&`, TIME `@`, capture `>` `<`); see [overview/glossary](/docs/contributing/overview/glossary).
+- Provide a complete, pasteable `.feature` snippet rather than a prose description.
+- State the environment: implementation version, toolchain version, OS / locale / timezone.

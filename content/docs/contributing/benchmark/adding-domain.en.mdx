@@ -1,0 +1,53 @@
+---
+title: Adding a Domain
+description: When to add a new benchmark domain, the required domain structure, review criteria, and the corresponding changes needed across language implementations.
+---
+
+Adding a domain is a high-impact change to the benchmark suite. A new domain introduces cross-implementation conformance cases and requires long-term maintenance. This page covers when to propose one, what it must contain, and how to meet the review criteria.
+
+## When to add a new domain
+
+A new domain is appropriate when:
+
+- The scenario type is not covered by any existing domain (for example, there is currently no "financial transaction" or "real-time messaging" domain).
+- The instruction combinations to be validated differ significantly from those in existing domains.
+- The domain represents an area that users are expected to reference as an example.
+
+A new domain is not the right approach when:
+
+- You only want to add one more case: add it to an existing domain instead.
+- You want to test an extreme edge case: use the ISA instruction feature under `specs/features/isa/instruction/{command}/` — no new domain is required.
+
+## Domain anatomy
+
+A new domain follows the adapter-conformance model (like `ecommerce_platform` / `todo_list`). Required structure:
+
+```
+benchmark/{domain}/
+├── specs/              # shared language-neutral spec: features/{isa,dsl}, api/, data/, isa.yml, sync.sh
+├── adapter/            # Java-For-All adapter (Spring Boot: ProxyController + run.sh)
+├── java/               # Java native benchmark (MockMvc)
+├── python/  typescript/  csharp/   # per-language target services
+└── README.md           # business scenario description
+```
+
+Scenarios under `specs/features/` use standard specformula-dev-framework instructions and symbols. For concrete examples, see [conformance-cases](/docs/contributing/benchmark/conformance-cases).
+
+## Review criteria for a new domain
+
+A proposal must satisfy all of the following:
+
+- **Justifiable scenario**: The domain corresponds to a real development use case and is not contrived solely to exercise specformula-dev-framework internals.
+- **Maintenance commitment**: Adding a domain increases the number of cross-implementation cases; the proposer must commit to long-term maintenance or identify a successor maintainer.
+- **Non-overlapping**: The testing purpose is clearly distinct from existing domains.
+- **Language-neutral**: The `specs/` API specification is language-neutral; the per-language targets can be submitted separately.
+
+## Corresponding changes across language implementations
+
+After a domain is added, each language implementation must:
+
+- Pass the domain's conformance cases.
+- Add support for any new adapter behavior required (typically HTTP client configuration).
+- Write a project-level ADR when necessary — for example, when a language's HTTP client has specific requirements for that domain.
+
+For adding a new language target to the benchmark, follow the Java-For-All adapter process; see [Adding a Language Target (Adapter)](/docs/contributing/benchmark/adding-language).

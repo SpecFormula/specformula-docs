@@ -1,0 +1,92 @@
+---
+title: Java 實作
+description: specformula-java 的框架依賴、架構設計、目錄結構、RI 額外責任與專案 ADR。
+---
+
+`specformula-java` 是 Reference Implementation (RI)，多模組 Maven 專案，額外承擔治理責任（見 [RI 額外責任](#ri-額外責任)）。同步 features 與 benchmark 驗收是各語言共通步驟，見 [Implementer 入口](/docs/contributing/implementer)。
+
+## 概覽
+
+- 模組：`specformula-plugin-api`（plugin 契約）、`specformula-core`（規格執行核心）、`specformula-cucumber`（BDD backend）、`specformula-spring`（Spring 測試適配）、`specformula-dsl`（DSL 編譯）、`specformula-testcontainer`（Testcontainers 整合）。
+- 框架依賴：Cucumber 7.15 + JUnit 5、Jackson 2.16（JSON / YAML）、Spring 6.1 / Boot 3.2（provided scope）、Apache HttpClient 5、Testcontainers。
+
+## 架構設計
+
+- **Plugin SPI**：用 Java `ServiceLoader` 載入（`java-0006`），內建 `BuiltinIsaPlugin`（指令）、`BuiltinRdbLifecyclePlugin`（DB 生命週期）、`BuiltinSpecReadersPlugin`（spec 載入）。
+- **Cucumber backend**：`specformula-cucumber` 透過 Cucumber `BackendProviderService` SPI 把 step 接到 core；`StepExecutor` 介面把執行細節對 Cucumber 隱藏。
+- **狀態**：`ScenarioContext` 包 `java.util.Map` 存 scenario 變數。
+- **DB 抽象**：預設 embedded（H2），postgres / mysql / mssql 走 Testcontainers，由 Maven profile 切換。
+
+## 目錄結構
+
+```
+specformula-java/
+├─ specformula-plugin-api/  # plugin 契約
+├─ specformula-core/        # 執行核心
+│  └─ src/main/java/ai/specformula/core/
+│     ├─ instruction/       # 指令
+│     ├─ helper/            # 符號系統、型別轉換
+│     └─ spec/              # isa / api / data reader
+├─ specformula-cucumber/    # BDD backend + stepdef
+├─ specformula-spring/      # Spring 測試適配
+├─ specformula-dsl/         # DSL 編譯
+└─ specformula-testcontainer/   # Testcontainers 整合
+```
+
+| 規格概念 | 位置（前綴 `specformula-core/.../core/`） |
+|---|---|
+| 指令（api-call、entity-setup、time-control…） | `instruction/`（`ApiCall.java`、`TimeControl.java`…） |
+| 符號系統（VAR `$`、CAS `&`、TIME `@`、capture `>` `<`） | `helper/ISAFeatureArgumentResolver.java` |
+| spec reader | `spec/`（`isa/IsaSpecReader`、`api/ApiSpecReader`、`data/EntityDdlReader`） |
+| BDD stepdef | `specformula-cucumber/.../backend/stepdefinition/` |
+
+## 環境安裝
+
+- JDK 17、Maven 3.6+（repo 無 wrapper，需自行裝 Maven）。
+- Docker 或相容容器 runtime：Testcontainers 需要；DB profile（postgres / mysql / mssql）也靠它。
+- 啟用容器重用：在 `~/.testcontainers.properties` 加 `testcontainers.reuse.enable=true`，否則每次測試重建容器。
+
+## 建置與測試
+
+```bash
+mvn clean install -DskipTests              # 全模組建置
+mvn test                                    # 全模組測試
+mvn test -pl specformula-core               # 單模組（預設 embedded H2）
+mvn test -pl specformula-core -Ppostgresql  # 換 DB：postgresql / mysql / mssql
+mvn test -pl specformula-core -Dcucumber.filter.tags="@smoke"  # tag 過濾
+```
+
+Lint / format 未配置（無 checkstyle / spotless）。
+
+## 常見 gotcha
+
+- 測試 JVM 時區強制 UTC（`pom.xml` `test.jvm.tz=UTC`）。
+- 時間型別：`ZonedDateTime`（`@time`）、`LocalDate`（`@date`）、`LocalTime`（`@localtime`）。
+- Spring 為 provided scope（測試專案自帶）；HTTP 用 Apache HttpClient 5 避開 401 retry。
+- Plugin 靠 `ServiceLoader` 發現，不用反射註冊。
+
+## 專案 ADR
+
+位置 `specformula-java/specs/adr/`，前綴 `java-`：
+
+| ADR | 主題 |
+|---|---|
+| `java-0001` | JSON path key 含 `.` 的跳脫 |
+| `java-0002` | ISA datasource schema 欄位 |
+| `java-0003` | 符號系統實作 |
+| `java-0004` | Entity JSON path 與 docstring |
+| `java-0005` | DSL 編譯層 |
+| `java-0006` | Plugin 架構（SPI） |
+| `java-0007` | Maven Central 發布流程 |
+
+寫法見 [writing-project-adr](/docs/contributing/implementer/writing-project-adr)。
+
+## RI 額外責任
+
+`specformula-java` 是 [Reference Implementation](/docs/contributing/implementer)，額外承擔：
+
+- **新全域 ADR 的可行性驗證**：accept 前由 Java 跑 spike / 部分實作，確認規格在語言層面可行。技術把關，不代表 Java 主導規格內容。
+- **首發 conformance benchmark**：新 domain / case 由 Java 第一個跑通，確保 conformance suite 可執行。
+- **語言中立自我審查**：Spring、Jackson、Java 時間型別等細節一律進 `java-NNNN` 專案 ADR，不可塞進全域 ADR。
+
+**RI 行為不等於規格**：Java 與全域規格不一致時 Java 是 bug。對齊基準是全域 ADR + `specs/features/`，不是 Java 行為。

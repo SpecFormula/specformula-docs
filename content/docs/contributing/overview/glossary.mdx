@@ -1,0 +1,85 @@
+---
+title: 詞彙表
+description: specformula-dev-framework 貢獻者常用術語定義，依類別分層。
+---
+
+以下術語依類別分層：指令、符號、規格與 SSOT、ADR 體系、benchmark 與驗證、角色與實作。每條包含定義與一個具體範例。內部連結指向對應的深度頁；repo 檔案路徑以行內程式碼呈現，不作為超連結。
+
+## 指令
+
+| 術語 | 定義 | 範例 |
+|---|---|---|
+| Command / Instruction | ISA 中的可執行指令單元，通常以 kebab-case 命名。 | `api-call`、`entity-setup`、`time-control` |
+| `api-call` | ISA 指令，依 ApiSpec 組裝並執行 HTTP API 呼叫。 | `specs/features/isa/instruction/api-call/` |
+| `entity-setup` | ISA 指令，建立測試資料或資料表前置狀態。 | `specs/features/isa/instruction/entity-setup/` |
+| `entity-validate` | ISA 指令，驗證資料庫 entity 狀態。 | `specs/features/isa/instruction/entity-validate/` |
+| `entity-non-existence-validate` | ISA 指令，驗證資料不存在。 | `specs/features/isa/instruction/entity-non-existence-validate/` |
+| `response-validate` | ISA 指令，驗證 API response 狀態、header、body 或符號擷取。 | `specs/features/isa/instruction/response-validate/` |
+| `time-control` | ISA 指令，控制測試情境中的當前時間。 | `specs/features/isa/instruction/time-control/time-control.feature` |
+
+## 符號
+
+| 術語 | 定義 | 範例 |
+|---|---|---|
+| Symbol | 符號系統：VAR (`$`) / CAS (`&`) / TIME (`@`) / VAR 擷取 (`>` `<`)。 | `$user.email`、`&eq(100)`、`@time(now)` |
+| VAR (`$`) | 變數解析 / 插值符號系統。 | `$session_id`、`${name}` |
+| CAS (`&`) | Constraint Assertion System，約束斷言符號系統。 | `&eq(100)`、`&gt(0)` |
+| TIME (`@`) | 時間表達式符號系統。 | `@time(now)`、`@date(2026-05-29)` |
+| VAR 擷取 (`>` `<`) | 將 response / execution variable 的值擷取並存入 context 的欄位語法。 | `>agentId` 搭配 `<id` |
+
+## 規格與 SSOT
+
+| 術語 | 定義 | 範例 |
+|---|---|---|
+| ISA (Instruction Set Architecture) | SpecFormula 用來描述 BDD 測試流程的框架層，定義指令集與符號系統的可觀察語義。 | `isa.yml`、`specs/features/isa/` |
+| Spec / 規格 | SpecFormula 的規格資產集合，含 ADR、Feature SSOT、vocab、terminology dictionary / mapping。 | `specs/` |
+| SSOT | Single Source of Truth = `specs/` 內所有文件：ADR（決策紀錄）與 feature（可執行規格，含 `vocab.md` / terminology）；benchmark 是驗證資產，不算 SSOT。 | `specs/adr/`、`specs/features/` |
+| Feature | `.feature` 檔，BDD 可執行規格。 | `specs/features/isa/instruction/time-control/time-control.feature` |
+| Scenario | feature 檔內的單一測試情境。 | `Scenario: 設定時間後查詢` |
+| Formula | SpecFormula 名稱中的概念詞，文件中不應把它當成另一套獨立規格層。 | — |
+
+## ADR 體系
+
+| 術語 | 定義 | 範例 |
+|---|---|---|
+| ADR | Architectural Decision Record。分全域與專案兩層。 | `specs/adr/0017-hierarchical-adr-system.md` |
+| Global-level ADR | 位於 `specs/adr/`，定義跨語言規格或架構決策。 | ADR-0017 |
+| Project-level ADR | 位於 `specformula-{lang}/specs/adr/`，定義該語言實作 / toolchain / package 決策。 | `specformula-java/specs/adr/java-0006-plugin-architecture-implementation.md` |
+| Legacy ADR | ADR-0017 生效前的全域 ADR（0000–0016）。可能夾雜早期 Java 實作或 repo 重構脈絡，閱讀時需回到目前 SSOT 判斷。 | ADR-0005 |
+| Variance declaration | project ADR 用來標示參考或背離哪個全域 ADR 的聲明。具體格式以 ADR-0017 與各語言 ADR 慣例為準。 | `> **參考基準**：ADR-0012` |
+| Spec-First Correction | 實作中發現規格瑕疵時，應回頭修正全域規格或 Feature SSOT，而不是只在某語言私補。 | ADR-0017 |
+| Strict Deviation Principle | 嚴格差異原則：語言實作若背離全域規格，需有明確記錄與理由。 | ADR-0017 |
+| Vertical Traceability | project ADR 應回連到全域規格脈絡，避免只在語言之間水平引用形成事實標準。 | ADR-0017 |
+
+## Benchmark 與驗證
+
+| 術語 | 定義 | 範例 |
+|---|---|---|
+| Benchmark | 實際 domain、fixture、target service、adapter / language runner 的驗證資產。用來提供跨 target 證據，但不代表每個 PR 都必須跑完所有語言。 | `benchmark/todo_list/`、`benchmark/ecommerce_platform/` |
+| Domain | benchmark 中的一組業務情境與 fixture。 | `ecommerce_platform`、`todo_list`、`guessing_game`、`agent_hr_system` |
+| Conformance | 某 target 對指定規格 / benchmark case 的行為一致性。需看 scope：單語言、單 domain 或跨 target。 | Java `specformula-core` tests 通過；`todo_list` adapter E2E 通過 |
+| Target service | benchmark domain 中被測的服務或應用。 | `benchmark/ecommerce_platform/*`、`benchmark/todo_list/*` |
+| Adapter | benchmark target service 與 SpecFormula runner 之間的橋接層；有些 domain 使用 adapter，有些語言 target 直接跑 native test。 | `benchmark/ecommerce_platform/adapter/` |
+
+## 角色與實作
+
+| 術語 | 定義 | 範例 |
+|---|---|---|
+| Spec author | 寫全域 ADR、feature、vocab、terminology 的貢獻者。 | — |
+| Implementer | 語言實作的維護者 / 貢獻者。 | `specformula-java`、`specformula-csharp` 開發者 |
+| Reference Implementation (RI) | 用於驗證規格可行性的參考實作，當前為 `specformula-java`。RI 行為不等於規格。 | — |
+| LSP plugin | Language Server Protocol 整合方向。目前不作為主線貢獻入口。 | `specformula-lsp-plugin/` |
+
+## 容易混淆對
+
+**spec 與 feature**：spec 是整體規格資產（含 ADR、feature、vocab、terminology）；feature 是其中 BDD 可執行規格檔（`.feature`）。
+
+**instruction 與 symbol**：instruction 是 ISA step / 指令能力（如 `api-call`、`time-control`）；symbol 是值解析或斷言的語法前綴（`$`、`&`、`@`、`>`、`<`）。
+
+**benchmark domain 與 target service**：domain 是一組業務情境與驗證資產；target service 是其中被測的服務 / app。不是每個 domain 都有相同語言或相同 adapter 形狀。
+
+**formula 與 expression**：Formula 是專案名稱中的概念詞；expression 多指特定語法構造（如 `@time(now-1h)`、`&eq(100)`）。
+
+**全域 ADR vs 專案 ADR**：全域定跨語言規格與架構方向；專案定某語言如何承載與實作。範例：「`time-control` 凍結時間後 observable 行為是什麼」屬全域；「C# 用 `DateTimeOffset` 還是其他型別承載」屬專案。
+
+**RI 與規格**：RI 是參考實作，規格是規範。RI 出現未定義行為不自動成為事實規格。詳見 [Reference Implementation](/docs/contributing/implementer)。

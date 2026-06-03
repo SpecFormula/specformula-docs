@@ -1,0 +1,150 @@
+---
+title: 貢獻流程 SOP
+description: 進場、規格更新、實作、benchmark 更新、文件更新五條流程。
+---
+
+import { Tab } from 'fumadocs-ui/components/tabs';
+
+動手前先更新規格（SSOT），再實作。實作與 benchmark 更新相接；功能完成後視需要更新文件，文件也可從進場直接開 issue / PR。尾端節點可點擊跳頁。
+
+## 全流程
+
+<HashTabs items={["進場", "規格更新", "實作", "benchmark 更新", "文件更新"]} hashes={["sop-entry", "sop-spec", "sop-impl", "sop-bench", "sop-docs"]}>
+
+<Tab>
+
+```mermaid
+flowchart TD
+    START(["想貢獻"]) --> Q{"做什麼？"}
+    Q -->|開 issue| ISSUE(["開 issue（提報 / 提案）"])
+    Q -->|純討論| DISC["Discussion 收斂"]
+    Q -->|開 PR| Q2{"PR 類型？"}
+    DISC -->|記錄| ISSUE
+    DISC -->|動手| Q2
+    Q2 -->|解 issue| Q3{"範圍？"}
+    Q2 -->|直接 PR| Q3
+    Q3 -->|規格| SPEC(["→ 規格更新"])
+    Q3 -->|語言實作| IMPL(["→ 實作"])
+    Q3 -->|benchmark| BENCH(["→ benchmark 更新"])
+    Q3 -->|文件| DOCS(["→ 文件更新"])
+    click SPEC href "#sop-spec"
+    click IMPL href "#sop-impl"
+    click BENCH href "#sop-bench"
+    click DOCS href "#sop-docs"
+```
+
+</Tab>
+
+<Tab>
+
+```mermaid
+flowchart TD
+    SPEC["規格更新"] --> Q1{"新增能力 還是 改既有？"}
+    Q1 -->|新增| Q2{"哪一層？"}
+    Q1 -->|改既有| Q3{"bug 還是 補強？"}
+    Q2 -->|新語法| BOTH
+    Q2 -->|新功能| BOTH
+    Q2 -->|架構| ADRONLY
+    Q3 -->|bug| FEAT
+    Q3 -->|補強| Q4{"跟既有 ADR 定義分歧？"}
+    Q4 -->|是| BOTH
+    Q4 -->|否| FEAT
+    FEAT["只更新 features"] --> NEXT(["→ 開實作 issue"])
+    ADRONLY["只新增 ADR"] --> NEXT
+    BOTH["新增 ADR + 更新 features"] --> NEXT
+    click NEXT href "#sop-impl"
+    click FEAT href "/docs/contributing/spec-author/executable-spec"
+    click ADRONLY href "/docs/contributing/spec-author/decision-record"
+    click BOTH href "/docs/contributing/spec-author/decision-record"
+```
+
+</Tab>
+
+<Tab>
+
+```mermaid
+flowchart TD
+    IMPL["實作 issue"] --> QADR{"需要專案 ADR？"}
+    QADR -->|是| PADR["寫專案 ADR"]
+    QADR -->|否| SYNC
+    PADR --> SYNC["同步全域 features"]
+    SYNC --> STEP["依 vocab.md 實作 stepdef"]
+    STEP --> BDD["BDD loop"]
+    BDD --> QBDD{"BDD 通過？"}
+    QBDD -->|否| STEP
+    QBDD -->|是| QBENCH{"有對應 benchmark？"}
+    QBENCH -->|否| TOBENCH(["→ benchmark 更新建立"])
+    QBENCH -->|是| ACC["benchmark 驗收"]
+    ACC --> QACC{"通過？"}
+    QACC -->|否| STEP
+    QACC -->|是| DONE(["完成"])
+    DONE --> TODOCS(["→ 文件更新（視需要）"])
+    click TOBENCH href "#sop-bench"
+    click IMPL href "/docs/contributing/implementer"
+    click PADR href "/docs/contributing/implementer/writing-project-adr"
+    click ACC href "/docs/contributing/benchmark/running-locally"
+    click TODOCS href "#sop-docs"
+```
+
+</Tab>
+
+<Tab>
+
+```mermaid
+flowchart TD
+    B0["benchmark 更新"] --> BK{"哪種更新？"}
+    BK -->|既有 domain 加 case / 變種| EDIT["改 domain specs<br/>.isa.feature · api · data · isa.yml"]
+    BK -->|新增 domain| NEWD["建新 domain<br/>specs + adapter + README"]
+    BK -->|擴展新語言| NEWL["加語言 target service<br/>+ Test Control API + Dockerfile"]
+    EDIT --> SYNC["sync.sh 散到各 target"]
+    NEWD --> SYNC
+    SYNC --> RIV["RI（java/）先驗證"]
+    RIV --> ADP["Java-For-All adapter<br/>驅動其他語言 target"]
+    NEWL --> ADP
+    ADP --> BACK(["→ 回實作驗收"])
+    click BACK href "#sop-impl"
+    click B0 href "/docs/contributing/benchmark"
+    click EDIT href "/docs/contributing/benchmark/conformance-cases"
+    click NEWD href "/docs/contributing/benchmark/adding-domain"
+    click NEWL href "/docs/contributing/benchmark/adding-language"
+    click ADP href "/docs/contributing/benchmark/running-locally"
+```
+
+</Tab>
+
+<Tab>
+
+```mermaid
+flowchart TD
+    DOCS["文件更新"] --> QKIND{"哪種文件？"}
+    QKIND -->|專案內 README / CONTRIBUTING / ADR| INREPO["跟程式碼同 PR 改<br/>GitHub render、無 build"]
+    QKIND -->|Docs 站 使用者 / 貢獻指南| SYNC["改 MDX：zh + en 同步"]
+    SYNC --> PREVIEW["pnpm dev 預覽、pnpm build 驗證"]
+    PREVIEW --> SUBPR["submodule PR → parent 更新 pointer"]
+    INREPO --> DONE(["完成"])
+    SUBPR --> DONE
+    click INREPO href "/docs/contributing/docs/maintaining"
+    click SYNC href "/docs/contributing/docs/translation"
+    click PREVIEW href "/docs/contributing/docs/maintaining"
+    click SUBPR href "/docs/contributing/docs/maintaining"
+```
+
+</Tab>
+
+</HashTabs>
+
+## SSOT
+
+**SSOT = `specs/` 內所有文件**，分兩類：
+
+- **ADR**（決策紀錄）：`specs/adr/`
+- **feature**（可執行規格）：`specs/features/`，內含 `vocab.md` 與 terminology
+
+規格更新就是更新 SSOT。feature 永遠要跟 ADR 一致；全域 ADR **不可變**、純語言中立（不含任何語言實作），要修訂就寫新 ADR 取代。
+
+## 延伸閱讀
+
+- 規格寫法：[spec-author](/docs/contributing/spec-author)
+- 專案 ADR：[implementer/writing-project-adr](/docs/contributing/implementer/writing-project-adr)
+- benchmark 與新增語言 target：[benchmark](/docs/contributing/benchmark)、[benchmark/adding-language](/docs/contributing/benchmark/adding-language)
+- RI 不等於規格、跨實作分流：[Reference Implementation](/docs/contributing/implementer)、[implementer/cross-impl-policy](/docs/contributing/implementer/cross-impl-policy)

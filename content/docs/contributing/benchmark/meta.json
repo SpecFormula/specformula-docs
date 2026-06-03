@@ -1,0 +1,4 @@
+{
+  "title": "Benchmark",
+  "pages": ["index", "adding-domain", "adding-language", "conformance-cases", "running-locally"]
+}

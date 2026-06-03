@@ -1,0 +1,66 @@
+---
+title: Implementer
+description: Entry point and standard flow for implementing the language-neutral spec in one language.
+---
+
+An Implementer brings the language-neutral spec (SSOT) into one language. Do one language at a time; the RI (Java) and the other languages follow the same flow, diverging only just before benchmark acceptance.
+
+## Standard flow
+
+1. **Decide whether you need a project ADR** — a language-level decision (lib, toolchain, performance, language-feature workaround) means write a [project ADR](/docs/contributing/implementer/writing-project-adr) first; pure spec implementation skips it.
+2. **Sync global features** — align with the latest feature files and `vocab.md` under `specs/features/`.
+3. **Implement stepdefs per vocab.md** — wire each step pattern to your language's implementation.
+4. **BDD loop** — run the language's BDD; on red, fix the stepdef / implementation until green.
+5. **Benchmark acceptance** — run conformance against the benchmark domains. If a new feature has no benchmark yet, first go through [benchmark update](/docs/contributing/benchmark) to create it with the RI, then come back.
+
+See the flow chart in the [Contribution Workflow (SOP)](/docs/contributing/lifecycle#sop-impl).
+
+## Shared steps (same across languages)
+
+These two steps are conceptually identical in every language — only the language argument differs.
+
+### Sync global features
+
+`specs/features/` is the read-only source. Use the root script to mirror it into the language project's test directory (terminology mapping is applied); never hand-edit the mirrored files — to change the spec, go to [spec-author](/docs/contributing/spec-author).
+
+```bash
+./scripts/sync-global-features.sh <java|typescript|python|csharp>
+./scripts/sync-global-features.sh java --dry-run   # preview the diff first
+```
+
+### Benchmark acceptance
+
+Run conformance against a benchmark domain; it passes only when fully green. First sync the domain's specs to the target with that domain's `specs/sync.sh --<lang>`, then run the language's acceptance:
+
+| Language | Acceptance (e.g. `ecommerce_platform`) |
+|---|---|
+| Java | `cd benchmark/ecommerce_platform/java && mvn test` |
+| TypeScript | `cd benchmark/ecommerce_platform/typescript && pnpm install && pnpm build && pnpm start` (target service) |
+| Python | `cd benchmark/ecommerce_platform/python && behave` |
+| C# | `cd benchmark/ecommerce_platform/csharp && dotnet test test/EcommercePlatform.Tests/…` |
+
+If a new feature has no benchmark yet, first create it with the RI via [benchmark update](/docs/contributing/benchmark).
+
+## Folders you touch
+
+- `specformula-{ts,java,python,csharp}/` — the language implementations, each with its own `specs/adr/` (project ADRs)
+- `specs/features/` — the spec source (read-only; to change it go to [spec-author](/docs/contributing/spec-author))
+- `benchmark/` — conformance acceptance
+
+## Language pages
+
+- [TypeScript](/docs/contributing/implementer/ts)
+- [Java (RI)](/docs/contributing/implementer/java)
+- [Python](/docs/contributing/implementer/python)
+- [C#](/docs/contributing/implementer/csharp)
+
+## How the RI differs
+
+`specformula-java` is the [Reference Implementation](/docs/contributing/implementer), additionally responsible for: feasibility-checking a new global ADR, the first conformance benchmark, and language-neutrality self-review (Java's own Spring / Jackson detail always goes in a project ADR).
+
+But **RI behavior is not the spec**: when Java disagrees with the spec, Java is the bug; the alignment baseline is always the global ADR + feature, never Java's behavior.
+
+## Cross-impl divergence / debugging
+
+- Consistency rules and triage (spec defect vs implementation deviation): [cross-impl-policy](/docs/contributing/implementer/cross-impl-policy)
+- How to investigate a red benchmark: [debugging](/docs/contributing/implementer/debugging)

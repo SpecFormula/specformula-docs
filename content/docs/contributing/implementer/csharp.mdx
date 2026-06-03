@@ -1,0 +1,72 @@
+---
+title: C# 實作
+description: specformula-csharp 的框架依賴、架構設計、目錄結構與專案 ADR。
+---
+
+`specformula-csharp` 是多目標 .NET solution（net8 + net10），BDD 用 Reqnroll。同步 features 與 benchmark 驗收是各語言共通步驟，見 [Implementer 入口](/docs/contributing/implementer)。
+
+## 概覽
+
+- 四層模組（`csharp-0001`）：`SpecFormula.Core`（執行核心）、`SpecFormula.PluginApi`（契約）、`SpecFormula.Reqnroll`（BDD）、`SpecFormula.AspNetCore`（web 適配）；另有 `SpecFormula.Testcontainers`、`SpecFormula.Dsl`（build-time 工具）。
+- 框架依賴：Reqnroll 3 + xUnit 2、YamlDotNet 16、Testcontainers .NET 4、`Microsoft.Extensions.DependencyInjection`、`System.Text.Json`。
+
+## 架構設計
+
+- **Plugin**：Reqnroll `IRuntimePlugin`（`csharp-0003`）。
+- **DI**：`Microsoft.Extensions.DependencyInjection`（不是 Spring）；Bridge 是手動 Singleton。
+- **Reqnroll hook Order**：0（讀 spec、init Bridge）→ 10（起容器）→ 100（使用者設定）；`reqnroll.json` 漏 `stepAssemblies` 會靜默跳過 hook。
+- **多目標**：library 同時出 net8 / net10。
+
+## 目錄結構
+
+```
+specformula-csharp/
+└─ src/
+   ├─ SpecFormula.Core/         # Instruction / SymbolSystem / Spec
+   ├─ SpecFormula.PluginApi/
+   ├─ SpecFormula.Reqnroll/     # IsaStepHandler partials、Hooks
+   ├─ SpecFormula.AspNetCore/   # web 適配
+   ├─ SpecFormula.Testcontainers/
+   └─ SpecFormula.Dsl/          # build-time DSL 工具
+```
+
+| 規格概念 | 位置（前綴 `src/SpecFormula.Core/`） |
+|---|---|
+| 指令（api-call、entity-setup、time-control…） | `Instruction/`（`ApiCall.cs`、`TimeControl.cs`…） |
+| 符號系統 | `SymbolSystem/`：`VarSystem.cs`（VAR `$` `>` `<`）、`CasSystem.cs`（CAS `&`）、`TimeSystem.cs`（TIME `@`） |
+| spec reader | `Spec/`（`Isa/IsaSpecReader.cs`、`Api/ApiSpecReader.cs`、`Data/EntityDdlReader.cs`） |
+| BDD stepdef / hooks | `src/SpecFormula.Reqnroll/`（`IsaStepHandler.cs` 與 partial、`Hooks/`） |
+
+## 環境安裝
+
+- .NET SDK 8.0 + 10.0（多目標 net8 / net10，建議兩個都裝）。
+- Docker 或相容容器 runtime：Testcontainers 需要。
+
+## 建置與測試
+
+```bash
+dotnet restore specformula-csharp/specformula-csharp.sln --locked-mode
+dotnet build   specformula-csharp/specformula-csharp.sln -c Release --no-restore
+dotnet test    specformula-csharp/specformula-csharp.sln -c Release
+```
+
+Lint / format 未配置（`Nullable` 已開）。
+
+## 常見 gotcha
+
+- 時間：`TIMESTAMPTZ` 轉 UTC（`DateTimeKind.Utc`），純 `TIMESTAMP` 轉 `Unspecified`。
+- Reqnroll hook 有 Order，漏 `stepAssemblies` 會靜默跳過。
+- DI 用 `Microsoft.Extensions.DependencyInjection`，Bridge 手動 Singleton。
+
+## 專案 ADR
+
+位置 `specformula-csharp/specs/adr/`，前綴 `csharp-`：
+
+| ADR | 主題 |
+|---|---|
+| `csharp-0001` | 基礎建設與依賴架構（含 .NET 10 LTS、Reqnroll 選型） |
+| `csharp-0002` | DSL 編譯層（in-place overwrite） |
+| `csharp-0003` | Plugin 架構 |
+| `csharp-0004` | NuGet 發布策略（lock file、OIDC） |
+
+寫法見 [writing-project-adr](/docs/contributing/implementer/writing-project-adr)。

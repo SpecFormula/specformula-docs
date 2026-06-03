@@ -1,0 +1,21 @@
+---
+title: Translation guide
+description: The documentation language policy — zh and en updated together, published in the same PR.
+---
+
+## Language policy
+
+Every page has a Traditional Chinese (zh-TW) and an English (en) version. **Any content change updates both versions and publishes them in the same PR** — no published state where only one language changed. The two versions therefore always reflect the same change; there is no question of one lagging behind or needing a stale flag.
+
+Third languages are not open yet, to avoid long-lived half-translated states.
+
+## Publishing in sync
+
+- Editing a page's `page.mdx` means editing its `page.en.mdx` too (and vice versa), both in the same PR.
+- Same for new pages: `page.mdx` + `page.en.mdx` go in together, and `meta.json` + `meta.en.json` are updated together (see [Adding a page](/docs/contributing/docs/adding-pages)).
+- Review both versions together; don't merge one language first and backfill the other later.
+
+## Translation consistency
+
+- Instruction names, symbols, paths, ADR numbers, code blocks, and file names are not translated and stay identical across languages (e.g. `api-call`, `specs/features/`, `lang:Java`).
+- Chinese wording follows existing pages and the [Style guide](/docs/contributing/docs/style-guide); don't invent synonyms.

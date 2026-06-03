@@ -1,0 +1,92 @@
+---
+title: Adding a Language Target (Adapter)
+description: Extending an existing benchmark domain to a new language implementation through the Java-For-All Adapter.
+---
+
+[Adding a domain](/docs/contributing/benchmark/adding-domain) introduces a new business scenario; this page is the other direction: extending an **existing** domain to a **new language** target service. This path goes through the Java-For-All Adapter; the design and rationale are in `specs/adr/0023-java-for-all-benchmark-adapter.md`.
+
+A new-language contributor only implements business logic, the Test Control API, and a Dockerfile — no test framework to build — and passes verification against the same Java-side Spec.
+
+## What the adapter is
+
+Each domain's `adapter/` is a Spring Boot subproject that shares the domain's language-neutral `specs/` (`.isa.feature`, `api-spec.yml`, Entity DDL).
+
+- The test side (`adapter/src/test`) uses Cucumber + SpecFormula + MockMvc, the same configuration as a normal Java benchmark.
+- The implementation side (`adapter/src/main`) is a catch-all `ProxyController` (`@RequestMapping("/**")`) that forwards every request as-is over HTTP to the target service. Adding an API requires no adapter change, and the SpecFormula framework needs no change either.
+- The DB is started once by Testcontainers on the Java side (PostgreSQL / MySQL); the target service connects to that same DB via environment variables.
+
+Because `entity-setup` / `entity-validate` run directly against the DB (JDBC) on the Java side, while `api-call` / `response-validate` are forwarded through the adapter, every language passes the exact same Spec — there is no standard gap caused by differing test frameworks.
+
+## How one scenario runs
+
+```text
+Given  Prepare data    ->  Java JDBC INSERT into DB
+When   Call API        ->  Java HTTP request -> adapter -> target service
+Then   Assert response ->  Java asserts HTTP status + body
+Then   Assert DB state ->  Java JDBC SELECT from DB
+```
+
+The target service reads and writes the same DB during the When step, so the Java side can assert DB state directly in the Then step.
+
+## Directory layout
+
+```text
+benchmark/<domain>/
+├── specs/            # Shared by all languages: features/*.isa.feature, api/api-spec.yml, data/*/DDL
+├── java/             # Java native benchmark (MockMvc mode, unchanged)
+├── adapter/          # Java-For-All adapter (Spring Boot: ProxyController + stepdefs + run.sh)
+├── python/           # Per-language target: business code + Dockerfile + build.sh
+├── typescript/
+├── csharp/
+└── ...               # go, rust, etc. depending on the domain
+```
+
+## Onboarding flow for a new language
+
+Per the domain's `adapter/run.sh` and `specs/adr/0023-java-for-all-benchmark-adapter.md`:
+
+1. Create a project under `benchmark/<domain>/<language>/`.
+2. Read `specs/api/api-spec.yml` and implement all business API endpoints.
+3. Read `specs/data/.../*.sql` and connect to the same DB (ORM or raw SQL, either is fine).
+4. Implement the Test Control API (see the next section).
+5. Write a `Dockerfile` (accepting the DB connection environment variables) and a `build.sh` (build the image only, no tests).
+6. Run the adapter tests and use a red-green BDD loop until every scenario passes.
+
+## Test Control API contract
+
+The target service is a separate process, so the in-process mock-time and JWT override mechanisms do not apply. The target service must therefore provide test-only endpoints (which the production build may omit):
+
+| Contract | Description |
+|---|---|
+| health check | Returns 200, so the harness can wait for readiness |
+| `POST /test/token` (`{"userId": ...}` → `{"token": "..."}`) | The target signs a token with its own secret and JWT library; the harness only places it in the `Authorization: Bearer` header of later requests |
+| `POST /test/time` (`{"now": "ISO8601"}`) | Sets mock time; business logic must obtain the current time through an overridable TimeService abstraction |
+| `DELETE /test/time` | Restores system time |
+| DB connection env vars | The target reads its DB connection from environment variables and connects to the same DB the harness started |
+
+In adapter mode, the `time-control` instruction sends `POST /test/time` to the target service to sync time at the same moment it sets the harness context.
+
+<Callout type="warn">
+The exact endpoint paths and environment variable names follow each domain's `adapter/run.sh` and `application.yml`. For example, `ecommerce_platform`'s health check is `/test/health`, and DB connection uses `DB_POSTGRESQL_URL` / `DB_POSTGRESQL_USERNAME` / `DB_POSTGRESQL_PASSWORD`. Read that domain's `run.sh` before starting.
+</Callout>
+
+## Running
+
+Each domain's `adapter/` directory has a standardized `run.sh`. Prerequisites: Docker running, Maven installed.
+
+```bash
+cd benchmark/ecommerce_platform/adapter
+
+./run.sh --build python          # build the python target image, then run tests
+./run.sh my-go-service:latest    # run against an existing image
+./run.sh --expected-failure      # run only scenarios tagged @expected-failure
+```
+
+Red-green loop: read the failing scenario, find the missing API or mismatched behavior, implement or fix it under `<language>/`, and rerun `run.sh` until everything is green.
+
+## Relationship to other pages
+
+- This is "extend an existing domain to a new language"; to add a brand-new business scenario, see [adding a domain](/docs/contributing/benchmark/adding-domain).
+- For its place in the overall flow, see the [contribution workflow SOP](/docs/contributing/lifecycle), stage 6 (extend to other languages).
+- For local execution and cross-implementation diff reading, see [running locally](/docs/contributing/benchmark/running-locally).
+- For the full design and architecture, see `specs/adr/0023-java-for-all-benchmark-adapter.md`.

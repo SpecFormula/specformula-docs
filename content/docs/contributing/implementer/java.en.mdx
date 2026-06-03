@@ -1,0 +1,92 @@
+---
+title: Java Implementation
+description: specformula-java frameworks, architecture, directory layout, RI responsibilities, and project ADRs.
+---
+
+`specformula-java` is the Reference Implementation (RI) — a multi-module Maven project that also carries governance duties (see [RI responsibilities](#ri-responsibilities)). Syncing features and benchmark acceptance are shared steps across languages — see the [Implementer entry](/docs/contributing/implementer).
+
+## Overview
+
+- Modules: `specformula-plugin-api` (plugin contract), `specformula-core` (spec execution core), `specformula-cucumber` (BDD backend), `specformula-spring` (Spring test adapter), `specformula-dsl` (DSL compilation), `specformula-testcontainer` (Testcontainers integration).
+- Framework dependencies: Cucumber 7.15 + JUnit 5, Jackson 2.16 (JSON / YAML), Spring 6.1 / Boot 3.2 (provided scope), Apache HttpClient 5, Testcontainers.
+
+## Architecture
+
+- **Plugin SPI**: loaded via Java `ServiceLoader` (`java-0006`), with built-in `BuiltinIsaPlugin` (instructions), `BuiltinRdbLifecyclePlugin` (DB lifecycle), `BuiltinSpecReadersPlugin` (spec loading).
+- **Cucumber backend**: `specformula-cucumber` wires steps to core through Cucumber's `BackendProviderService` SPI; the `StepExecutor` interface hides execution detail from Cucumber.
+- **State**: `ScenarioContext` wraps a `java.util.Map` for scenario variables.
+- **DB abstraction**: embedded (H2) by default; postgres / mysql / mssql via Testcontainers, switched by Maven profile.
+
+## Directory layout
+
+```
+specformula-java/
+├─ specformula-plugin-api/  # plugin contract
+├─ specformula-core/        # execution core
+│  └─ src/main/java/ai/specformula/core/
+│     ├─ instruction/       # instructions
+│     ├─ helper/            # symbol system, type conversion
+│     └─ spec/              # isa / api / data readers
+├─ specformula-cucumber/    # BDD backend + stepdefs
+├─ specformula-spring/      # Spring test adapter
+├─ specformula-dsl/         # DSL compilation
+└─ specformula-testcontainer/   # Testcontainers integration
+```
+
+| Spec concept | Location (prefix `specformula-core/.../core/`) |
+|---|---|
+| Instructions (api-call, entity-setup, time-control…) | `instruction/` (`ApiCall.java`, `TimeControl.java`…) |
+| Symbol system (VAR `$`, CAS `&`, TIME `@`, capture `>` `<`) | `helper/ISAFeatureArgumentResolver.java` |
+| Spec readers | `spec/` (`isa/IsaSpecReader`, `api/ApiSpecReader`, `data/EntityDdlReader`) |
+| BDD stepdefs | `specformula-cucumber/.../backend/stepdefinition/` |
+
+## Environment setup
+
+- JDK 17, Maven 3.6+ (no wrapper in the repo — install Maven yourself).
+- Docker or a compatible container runtime: required by Testcontainers; the DB profiles (postgres / mysql / mssql) rely on it.
+- Enable container reuse: add `testcontainers.reuse.enable=true` to `~/.testcontainers.properties`, otherwise every test rebuilds containers.
+
+## Build and test
+
+```bash
+mvn clean install -DskipTests              # build all modules
+mvn test                                    # all modules
+mvn test -pl specformula-core               # one module (default embedded H2)
+mvn test -pl specformula-core -Ppostgresql  # switch DB: postgresql / mysql / mssql
+mvn test -pl specformula-core -Dcucumber.filter.tags="@smoke"  # tag filter
+```
+
+Lint / format is not configured (no checkstyle / spotless).
+
+## Gotchas
+
+- Test JVM timezone is forced to UTC (`pom.xml` `test.jvm.tz=UTC`).
+- Time types: `ZonedDateTime` (`@time`), `LocalDate` (`@date`), `LocalTime` (`@localtime`).
+- Spring is provided scope (test projects bring their own); HTTP uses Apache HttpClient 5 to avoid 401 retry issues.
+- Plugins are discovered via `ServiceLoader`, not reflection registration.
+
+## Project ADRs
+
+Under `specformula-java/specs/adr/`, prefix `java-`:
+
+| ADR | Topic |
+|---|---|
+| `java-0001` | Escaping `.` in JSON path keys |
+| `java-0002` | ISA datasource schema field |
+| `java-0003` | Symbol system implementation |
+| `java-0004` | Entity JSON path and docstring |
+| `java-0005` | DSL compilation layer |
+| `java-0006` | Plugin architecture (SPI) |
+| `java-0007` | Maven Central release flow |
+
+How to write them: [writing-project-adr](/docs/contributing/implementer/writing-project-adr).
+
+## RI responsibilities
+
+`specformula-java` is the [Reference Implementation](/docs/contributing/implementer), additionally responsible for:
+
+- **Feasibility check for a new global ADR**: before acceptance, Java runs a spike / partial implementation to confirm the spec is implementable at the language level. A technical gate, not Java steering the spec.
+- **First conformance benchmark**: a new domain / case is first made green by Java, ensuring the conformance suite is runnable.
+- **Language-neutrality self-review**: Spring, Jackson, Java time-type detail always goes into a `java-NNNN` project ADR, never the global ADR.
+
+**RI behavior is not the spec**: when Java disagrees with the global spec, Java is the bug. The alignment baseline is the global ADR + `specs/features/`, not Java's behavior.

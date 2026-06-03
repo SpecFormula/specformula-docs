@@ -1,4 +1,6 @@
 {
-  "title": "Gherkin",
+  "title": "Spec Guide",
+  "root": true,
+  "description": "SpecFormula ISA user documentation",
   "pages": ["dsl", "isa"]
 }

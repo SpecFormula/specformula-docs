@@ -1,0 +1,96 @@
+---
+title: Python 實作
+description: specformula-python 的框架依賴、架構設計、目錄結構與專案 ADR。
+---
+
+`specformula-python` 是 uv workspace monorepo，merge gate 權威來源是 `ACCEPTANCE.md`。同步 features 與 benchmark 驗收是各語言共通步驟，見 [Implementer 入口](/docs/contributing/implementer)。
+
+## 概覽
+
+- 6 個 package：`specformula-plugin-api`（plugin 契約）、`specformula-core`（執行核心）、`specformula-bridge`（橋接層）、`specformula-behave`（BDD）、`specformula-dsl`（DSL 預處理）、`specformula-testcontainer`（Testcontainers 整合）。
+- 框架依賴：behave（BDD）、pytest、basedpyright（型別 strict）、ruff + import-linter、Hatchling（build）、DuckDB（預設測試 DB）。
+
+## 架構設計
+
+- **強制分層**：ruff `banned-api` 擋跨層 import（`core` 不可 import `bridge` / `behave`）；測試也分層，不可跨層。
+- **同步執行**：core / bridge / behave 無 async、無 asyncio。
+- **Plugin**：step 由 `isa.yml` 的指令清單在 `before_all` 動態註冊。
+- **時間**：`runtime/clock.py` 一律回 timezone-aware datetime；scenario 時鐘可變，`before_scenario` 會 reset。
+
+## 目錄結構
+
+```
+specformula-python/
+└─ packages/
+   ├─ specformula-plugin-api/   # plugin 契約
+   ├─ specformula-core/src/specformula/core/
+   │  ├─ instructions/   # 指令
+   │  ├─ symbols/        # 符號系統
+   │  ├─ specs/          # isa / api / entity reader
+   │  ├─ runtime/        # clock 等
+   │  └─ http/
+   ├─ specformula-bridge/        # 橋接層
+   ├─ specformula-behave/src/specformula/behave/   # hooks / matchers / plugin
+   ├─ specformula-dsl/           # DSL 預處理
+   └─ specformula-testcontainer/   # Testcontainers 整合
+```
+
+| 規格概念 | 位置（前綴 `packages/specformula-core/src/specformula/core/`） |
+|---|---|
+| 指令（api-call、entity-setup、time-control…） | `instructions/`（`api_call.py`、`time_control.py`…） |
+| 符號系統 | `symbols/`：`resolver.py`（VAR `$`、capture `>` `<`）、`constraints.py`（CAS `&`）、`time_expr.py`（TIME `@`）、`prefix.py`（`P:` `Q:` `H:` `B:`） |
+| spec reader | `specs/`（`isa/reader.py`、`api/reader.py`、`entity/reader.py`） |
+| BDD stepdef / hooks | `packages/specformula-behave/src/specformula/behave/` |
+
+## 環境安裝
+
+Python 3.10+（`.python-version`）。跑非 DuckDB 的 DB 測試需要 Docker 或相容容器 runtime。兩種方式擇一：
+
+**uv（推薦）** — 先[裝 uv](https://docs.astral.sh/uv/getting-started/installation/)：
+
+```bash
+cd specformula-python
+uv sync --all-groups        # 安裝全部 dependency-group
+```
+
+**pip 25.1+**（舊版不支援 `--group`）：
+
+```bash
+python -m venv .venv && source .venv/bin/activate   # Windows：.venv\Scripts\activate
+pip install -e . --group lint --group typing --group test
+```
+
+之後所有指令（ruff、pytest、behave）都要在 venv 內跑。
+
+## 建置與測試
+
+```bash
+uv run --group test behave          # BDD（預設 DuckDB，免 Docker）
+uv run --group test behave -D db.type=postgresql  # 換 DB（需 Docker）
+uv run --group test pytest          # 單元
+uv run --group lint ruff format --check   # 格式（在 ruff check 之前）
+uv run --group typing basedpyright  # 型別
+```
+
+## 常見 gotcha
+
+- 型別：只用 PEP 585 / 604（`list[...]`、`X | None`），不用 `typing.List` / `Optional`。
+- 分層隔離：ruff `banned-api` 擋跨層 import。
+- 同步模型：無 async，沒有 GIL 議題。
+
+## 專案 ADR
+
+位置 `specformula-python/specs/adr/`，前綴 `python-`：
+
+| ADR | 主題 |
+|---|---|
+| `python-0001` | JSON path key 含 `.` 的跳脫 |
+| `python-0002` | ISA datasource schema 欄位 |
+| `python-0003` | `B:` / `H:` 符號實作 |
+| `python-0004` | Entity JSON path 與 docstring |
+| `python-0005` | 例外 taxonomy |
+| `python-0006` | SSOT / ISA TCK 同步慣例 |
+| `python-0007` | Plugin 架構（uv workspace、behave） |
+| `python-0008` | DSL 預處理輸出位置 |
+
+寫法見 [writing-project-adr](/docs/contributing/implementer/writing-project-adr)。

@@ -1,0 +1,100 @@
+---
+title: 決策紀錄（ADR）
+description: 全域 ADR 的五段結構（各段怎麼寫）、範疇判斷、範本與反模式。
+---
+
+全域 ADR 記錄跨語言的規格 / 架構決策，**語言中立、不含任何語言實作**。ADR 不可變，要修訂就寫新 ADR 取代。範本：`specs/adr/0000-adr-template.md`。
+
+## 結構
+
+一份 ADR 五段。各段的目的與寫法：
+
+### Context
+
+**是什麼**：決策的背景與現狀 —— 為什麼現在需要這份 ADR。只寫事實與限制，不含解法。
+
+**好的寫法**：開門見山講現狀的痛點；只列與這個決策相關的事實、既有規格、約束條件；中立陳述。讀者看完第一段就該知道「為什麼有這份 ADR」。
+
+**避免**：一句話帶過、把解法偷渡進來、鋪陳一堆無關背景。
+
+**參考**：`specs/adr/0017` 的 Context 用「描述 / 現狀限制」兩段，先講 monorepo 多語言結構，再點出「Java 細節混入全域 ADR」的痛點，全程沒有解法。
+
+### Problem
+
+**是什麼**：在這個 Context 下，具體要解決的問題。聚焦一個。
+
+**好的寫法**：寫成可檢驗的具體陳述 —— 「目前無法 X」「Y 在各語言不一致」「Z 沒有定義」。一句話就能讓人抓到核心。
+
+**避免**：含糊的願望（「想改善體驗」）、把解法偽裝成問題。
+
+**參考**：`0017` 的 Problem 列三個具體問題（規格與實作高度耦合、全域資訊污染、維護權責混淆）；`0021` 用編號列（規格缺可執行驗證、Java 術語耦合、無統一合規基準）。
+
+### Forces
+
+**是什麼**：讓這個問題不好解的各個 forces —— 互相牽制的取捨、限制、需求（至少 3 個）。後面用它們當評估方案的標準。
+
+**好的寫法**：列出彼此衝突的考量，例如「規格一致性 vs 各語言自治」「嚴謹 vs 可讀」「向下相容 vs 簡潔」；每個 force 說明它如何影響這個決策。有衝突才叫 forces。
+
+**避免**：只列好處、漏掉衝突面、寫成單純的需求清單。
+
+**參考**：`0017` 的 Forces 列四個互相牽制的面向（規格純粹性 / 架構一致性 / 實作自治性 / 可追蹤性）；`0023` 列五個（測試標準一致性、最小實作門檻、現有架構相容、DB 狀態可控、跨 process 控制）。
+
+### Solution
+
+**是什麼**：選定的解法。語言中立的語法 / 語義 / 錯誤合約。
+
+**好的寫法**：具體到可實作 —— grammar 用 EBNF、引數規則、錯誤合約、邊界行為；分節寫（結構、命名、規則）；明說它如何平衡上面的 forces。完全不寫任何語言的 library 或型別（那屬於專案 ADR）。
+
+**避免**：只給方向不給規則、混入語言實作細節、跟 Forces 脫節（沒回應前面列的取捨）。
+
+**參考**：`0017` 的 Solution 用「解法摘要 + 解法設計」，設計分節（結構與路徑、編號命名、差異聲明、審查治理），每節有具體規則（路徑、前綴對照表、格式），完全語言中立。
+
+### Resulting Context
+
+**是什麼**：採用這個解法後的結果 —— 好處、代價、新產生的限制與後續工作。
+
+**好的寫法**：誠實列 Pros / Cons；標出新的約束、遷移成本、待辦事項；必要時連到 tracking issue。
+
+**避免**：Cons 寫「無」（red flag，代表沒認真想取捨）、只報喜不報憂。
+
+**參考**：`0017` 的 Resulting Context 分 Pros（4）/ Cons（2），Cons 具體寫「查閱鏈條」「維護成本」；並另列「其他可能解法」兩個被否決方案各有 Pros / Cons。
+
+## 範疇判斷（動筆前）
+
+| 你要決定什麼 | 走哪層 |
+|---|---|
+| 新語法 / 符號 / 指令 / 跨語言語義 | 全域 ADR（本頁） |
+| 特定語言實作選擇（lib、toolchain、效能、語言特性 workaround） | 專案 ADR（見 [implementer/writing-project-adr](/docs/contributing/implementer/writing-project-adr)） |
+| 不確定 | 開 Discussion 先聊 |
+
+依據參考 `specs/adr/0017-hierarchical-adr-system.md` §4。實作中發現規格瑕疵走 Spec-First Correction：回頭改全域規格，不在專案 ADR 私補。
+
+## 範本
+
+範本一律用 `specs/adr/0000-adr-template.md`，整體寫法可參考 `specs/adr/0017-hierarchical-adr-system.md`（各段細節見上方「參考」）。不要抄帶 Java 細節的 legacy ADR（如 `0005`）。
+
+## 反模式（示意）
+
+```markdown
+# NNNN-add-retry-mechanism
+
+# Context
+有時候 API 會失敗，要重試。
+
+# Solution
+新增 @retry 指令。Java 用 Spring Retry、Python 用 tenacity、TS 用 axios-retry。
+
+# Resulting Context
+- Pros：方便
+- Cons：無
+```
+
+問題：Context 過短、無 Problem / Forces；`@` 是 TIME 符號 prefix 不可當指令名（指令用 kebab-case）；Solution 混入語言 library，違反語言中立；Cons 寫「無」代表沒思考取捨。
+
+## 常見坑
+
+| 坑 | 怎麼避 |
+|---|---|
+| 跳過 Forces | 至少列 3 個 forces |
+| Solution 混語言 | 全域只寫語言中立行為；實作細節進專案 ADR |
+| Alternatives 草草 | 至少 1 個被否決方案 + 否決理由 |

@@ -1,0 +1,61 @@
+---
+title: Conformance Case 格式
+description: benchmark domain conformance case 的組織方式、覆蓋安排、expected-failure，以及與全域 ISA feature 的分工。ISA 語法本身見使用者文件。
+---
+
+一個 conformance case 是 domain 的 `*.isa.feature` 檔，用該 domain 的步驟語彙描述業務情境；所有語言實作都要過同一份 case。
+
+ISA 的實際寫法已在使用者文件完整說明，貢獻時直接參考，不在此重述：
+
+- [規格三巨頭](/docs/gherkin/isa/backend/three-specs) — Feature + API Spec + Entity Spec 如何組成一個 case（步驟的 `summary` 對 api spec、`entity` 對 entity mapping）
+- [指令](/docs/gherkin/isa/backend/instructions) — `entity-setup`、`api-call`、`response-validate`、`time-control` 等步驟格式
+- [符號系統](/docs/gherkin/isa/backend/symbols) — VAR（`$` `>` `<`）、CAS（`&`）、TIME（`@`）
+- [ISA Config](/docs/gherkin/isa/backend/config) — `isa.yml` 的 instruction 與資料源設定
+
+本頁只談 benchmark conformance case 特有的部分。
+
+## 一個真實 case
+
+`ecommerce_platform/specs/features/isa/訂單過期.isa.feature`：
+
+```gherkin
+Feature: 訂單過期
+
+  超過 30 分鐘未付款的訂單由系統批次標記為 EXPIRED。
+  覆蓋 TimeControl 多次推進、正負相對時間（含複合 offset now-1M-2d-1h）、日期篩選。
+
+  Background:
+    Given 現在時間為 "2026-08-01T10:00:00"
+    And 準備一個使用者, with table:
+      | >Owner1.id | name | email               | role       | status |
+      | <userId    | 店主 | owner@ecommerce.com | SHOP_OWNER | ACTIVE |
+
+  Rule: 在付款期限內可成功付款
+
+    Example: 29 分鐘內付款成功
+      When (UID="$Buyer.id") 建立訂單, call table:
+        | >Order1.id | shopId    | items[0].productId | items[0].quantity |
+        | <orderId   | $Shop1.id | $Product1.id       | 1                 |
+      Then 建立訂單(201)回應, with table:
+        | orderId    | status  | paymentDeadline                |
+        | $Order1.id | PENDING | &sameTime(2026-08-01T10:30:00) |
+```
+
+domain 步驟（`建立訂單`、`使用者`）不是自由文字——它們來自該 domain 的 api spec `summary` 與 entity mapping。寫 case 前先看 `specs/api/` 與 `specs/data/<source>/` 有哪些可用的 operation 與 entity，data table 欄位也要對齊其 schema / 欄位。
+
+## 覆蓋怎麼安排
+
+domain 按**業務情境**分檔（`訂單過期`、`退款申請`、`優惠券`、`出貨追蹤`…），每個 `Feature` 的描述直接寫清楚它覆蓋什麼。沒有「每個指令 × 固定類別」的硬性矩陣；以業務情境涵蓋指令組合即可。多資料源（postgres / mysql / mssql）與型別涵蓋另有專檔（如 `型別涵蓋_MySQL`）。
+
+## expected-failure
+
+驗證「框架該拒絕的輸入確實被拒絕」的 case 標 `@expected-failure`，命名 `預期失敗_*.isa.feature`（如 `預期失敗_CAS語法錯誤`，驗 CAS 語法不合法時正確拋錯）。框架層的預期失敗案例另放 `specs/expected-failure/`（`zero-isa-match`、`json-capture-not-allowed` 等）。adapter 跑 `./run.sh --expected-failure` 只跑這些。
+
+## domain case vs 全域 ISA feature
+
+兩者職責不重疊：
+
+- **domain case**（`benchmark/<domain>/specs/features/`）：在業務情境下使用指令，驗跨實作行為一致。
+- **全域 ISA feature**（`specs/features/isa/instruction/<command>/`）：測指令本身的語義，是指令行為的權威規格。
+
+要為某指令的語義寫測試，放全域 ISA feature；只是在 domain 情境用到該指令，放 domain case。

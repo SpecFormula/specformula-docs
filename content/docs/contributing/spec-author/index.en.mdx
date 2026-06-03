@@ -1,0 +1,23 @@
+---
+title: Spec Author
+description: Entry point for maintaining the language-neutral spec (SSOT); only two kinds of contribution.
+---
+
+A Spec Author maintains the language-neutral spec (SSOT) and produces only **two** kinds of contribution:
+
+1. **[Decision record (ADR)](/docs/contributing/spec-author/decision-record)** — records cross-language spec / architecture decisions.
+2. **[Executable spec (feature)](/docs/contributing/spec-author/executable-spec)** — the feature files, `vocab.md`, and terminology under `specs/features/` that define observable behavior.
+
+## Folders you touch
+
+- `specs/adr/` — global ADRs (decision records).
+- `specs/features/` — feature files, `vocab.md`, terminology dictionary / mapping.
+
+## Folders you do not change
+
+- `specformula-{lang}/` (language implementations and their project ADRs).
+- `benchmark/` target services and the adapter.
+
+## A new symbol / instruction uses both
+
+To define a new symbol or instruction, the **decision** goes into an ADR (language-neutral semantics, syntax, error contract) and the **executable spec** goes into a feature + `vocab.md`. Both together — not one side only; features must always stay consistent with ADRs.

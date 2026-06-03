@@ -1,0 +1,131 @@
+---
+title: 撰寫專案 ADR
+description: ADR-0017 的執行細則：何時需要寫專案 ADR、如何命名、格式要求與 review 流程。
+---
+
+專案 ADR（Project ADR）記錄各語言實作在實作層面的決策，與全域 ADR 的語言中立規格決策互補。本頁是 ADR-0017 (`specs/adr/0017-hierarchical-adr-system.md`) 的執行細則，說明什麼情況需要寫、怎麼寫、以及禁止事項。
+
+整個流程的上游規範見 [spec-author/decision-record](/docs/contributing/spec-author/decision-record)。
+
+## 何時需要寫專案 ADR
+
+以下情況需要在該語言的 `specformula-{lang}/specs/adr/` 下建立專案 ADR：
+
+- Lib / framework 選型（例如 Python 選 `httpx` vs `aiohttp`）
+- Toolchain 選擇（例如 Python 選 `uv` vs `pip`）
+- 語言特性 workaround（GIL、AOT、native time type 差異）
+- 效能優化選擇（例如 caching、connection pooling 策略）
+- 與全域規格的合理背離（須有技術限制理由）
+
+## 何時不該寫專案 ADR
+
+- 發現規格瑕疵 → 走 Spec-First Correction，回 [spec-author/decision-record](/docs/contributing/spec-author/decision-record)，不要在專案 ADR 裡私自重新詮釋規格。
+- 想私下定義與全域規格相悖的「私有標準」→ 明令禁止。
+- 引用另一個語言的專案 ADR → 禁止水平依賴（例如 python-0001 不可引用 java-0002）。
+
+## 檔名與位置
+
+- 位置：`specformula-{lang}/specs/adr/`
+- 命名格式：`{prefix}-NNNN-kebab-case.md`
+
+前綴對照：
+
+| Sub-package | 前綴 |
+|---|---|
+| `specformula-python` | `python-` |
+| `specformula-java` | `java-` |
+| `specformula-csharp` | `csharp-` |
+| `specformula-ts` | `ts-` |
+| `specformula-lsp-plugin` | `lsp-plugin-`（前綴保留；該子套件目前不在開發範圍）|
+
+## Variance declaration header
+
+每份專案 ADR 第一節（標題之後、Context 之前）必須有 variance declaration，說明這份 ADR 對應或背離了哪個全域 ADR。
+
+背離全域規格時：
+
+```
+> **參考基準**：ADR-NNNN
+```
+
+局部擴充（無對應全域規格）時：
+
+```
+> **參考基準**：None
+```
+
+## 範例 A：背離全域規範
+
+```markdown
+# python-0001: time-control 內部以 datetime.datetime 承載
+
+> **參考基準**：ADR-0005
+
+# Context
+
+ADR-0005 定義 time-control 輸出帶時區的 DateTimeTZ 概念。Python 標準函式庫的 `datetime.datetime` 帶 tzinfo 即可表達此概念，無須引入 `arrow` 或 `pendulum`。
+
+# Solution
+
+內部以 `datetime.datetime` + `zoneinfo.ZoneInfo` 承載 DateTimeTZ。對外 API 序列化遵循全域規格的 ISO 8601 含時區格式。
+
+# Resulting Context
+- Pros：零外部依賴
+- Cons：3.8 以下不支援（已過 EOL，無影響）
+```
+
+注：ADR-0005 (`0005-time-system-outputs-java-time-types.md`) 是 legacy ADR，與 Java 實作細節耦合，是 ADR-0017 所要修正的典型案例。背離此 ADR 的專案 ADR 應在 Context 中說明這層歷史背景。
+
+## 範例 B：局部擴充（參考基準 None）
+
+```markdown
+# python-0002: 使用 uv 作為套件管理工具
+
+> **參考基準**：None
+
+# Context
+
+Python 套件管理工具選擇與全域規格無關，純屬該語言生態決策。`uv` 比 `pip` / `poetry` 快約 10x，已被社群廣泛採用。
+
+# Solution
+
+用 `uv` 管理依賴與虛擬環境。`pyproject.toml` 同時相容 `pip` 安裝以保留 fallback。
+
+# Resulting Context
+- Pros：安裝速度、lockfile reproducibility
+- Cons：相對新，需要關注其 breaking change
+```
+
+## 內容章節要求
+
+沿用全域 ADR 結構（`specs/adr/0000-adr-template.md`）：
+
+- Context
+- Problem
+- Forces
+- Solution
+- Resulting Context（Pros / Cons）
+- Alternatives（其他可能解法）
+
+背離型 ADR 額外要求以下四項：
+
+1. **背離理由**：具體的技術限制，不可只寫「我比較習慣」。
+2. **Workaround 描述**：規格上預期的行為如何用該語言的替代方案達成。
+3. **限制條件**：哪些情境不適用此 workaround。
+4. **Migration path**：若未來規格更新或語言生態改變，能否回歸標準路徑。
+
+## Review 流程
+
+- **PR 即審查**：開 PR 後由該語言 maintainer review，不需要全域 maintainer 同意，除非審查中發現這份 ADR 的範疇應升為全域。
+- **審閱重點**：
+  - 背離理由是否有技術依據（lib 選型差異微小、無重大影響，可考慮不寫）
+  - Variance declaration 是否正確指向全域 ADR
+  - 無水平依賴（不引用其他語言的專案 ADR）
+
+## 禁止事項
+
+1. **不可引用其他語言的專案 ADR**（禁止水平依賴）
+2. **不可定義與全域規格相悖的私有標準**（規格瑕疵走 Spec-First Correction）
+3. **不可把實作細節塞進全域 ADR**（Strict Deviation Principle）
+
+違反以上任一項，PR review 將退回要求修正。

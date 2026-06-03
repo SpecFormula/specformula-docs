@@ -1,0 +1,97 @@
+---
+title: PR 自我檢查清單
+description: 送出 Pull Request 前的標準對照清單，補充說明 .github/pull_request_template.md 各區段的意圖。
+---
+
+`.github/pull_request_template.md` 會在開 PR 時自動載入。這份頁面逐區段說明各欄位的用意，協助你在送 PR 前完成自我審查，減少 review 來回。
+
+## 必檢項目
+
+### Change type 與 Scope
+
+在模板的 **Change type** 與 **Scope** 兩區勾選符合的項目。兩區可複選；勾選範圍要符合實際異動，不要低報也不要高報。
+
+### Spec / contract impact
+
+模板的 **Spec / contract impact** 區要求你說明對合約的影響：
+
+- 若有行為改變，填寫 contract 定義的位置（ADR 編號或路徑、feature 檔、vocab、benchmark fixture）。
+- Java RI 驗證新行為 → 勾選對應項目。
+- Follow-up 工作（其他語言尚未跟進）→ 明確列出。
+
+### Tests / verification
+
+- 跑過受影響的語言 / module 測試。
+- 若涉及 benchmark domain，跑對應的 case（`benchmark/` 下該 domain 的 scenario）。
+- 未跑的部分，在「Not run; reason:」欄說明原因。
+
+### Documentation
+
+對照模板的 **Documentation** 區確認：
+
+- 涉及指令 / 符號 / 行為 → `specs/features/` 的 feature 規格、`vocab.md`、`terminology-dictionary.yml`、`specformula-docs/` 的 docs reference。
+- 涉及貢獻流程 → 對應 `/docs/contributing/` 頁面。
+
+### Compatibility / migration
+
+模板的 **Compatibility / migration** 區：若是 breaking change，勾選「Breaking change; migration note included」並在 PR 描述中附 before/after 範例。
+
+### Reviewer 指派
+
+`.github/CODEOWNERS` 目前尚未建立。確認 GitHub 的「Reviewers」欄有人；若自動指派未觸發，手動 ping 相關 maintainer。
+
+---
+
+## 進階檢查（依 PR 性質選用）
+
+### 層級邊界
+
+- 規格 PR 不夾帶語言實作細節（語言中立檢查，見 [spec-author/executable-spec](/docs/contributing/spec-author/executable-spec)）。
+- 專案 ADR PR 不擅改全域規格；若發現規格有瑕疵，走 Spec-First Correction 流程另開 issue。
+
+### Breaking change 的 migration path
+
+PR 描述含 before/after 範例，並在模板的 **Compatibility / migration** 區勾選。
+
+### Translation 影響
+
+翻譯為手動維護。異動英文 docs 頁時，在 PR 中標出哪些翻譯頁需要更新，或在對應翻譯檔 frontmatter 標 `stale: true`（見 [docs/translation](/docs/contributing/docs/translation)）。
+
+### Legacy ADR 引用檢查
+
+- 不抄 ADR 0000–0016 中混入語言細節的寫法（參見 `specs/adr/0005-time-system-outputs-java-time-types.md` 作為反例）。
+- 若新規格與 legacy ADR 有衝突，PR 描述中明確說明取代關係。
+
+---
+
+## PR 描述格式
+
+模板的 **Summary** 區為自由文字。建議結構：
+
+```markdown
+## 變更摘要
+（一段話，使用者視角的影響）
+
+## 動機
+（解決什麼問題；連對應 issue / ADR）
+
+## 變更內容
+（list；列出主要的程式碼 / 規格 / 文件變更）
+
+## 測試
+（怎麼驗證；附 reproduce 步驟若可能）
+
+## 跨實作影響
+（若有；列出尚未跟進的其他語言實作）
+
+## Breaking？
+（是 / 否；若是，附 migration path）
+```
+
+模板的 **Follow-up work** 區列出已知但這版 PR 未處理的後續工作，包含尚未跟進的語言、還需要補的文件或追蹤 issue。
+
+---
+
+## AI 協助聲明
+
+模板包含 **AI assistance** 區段。若使用 AI 工具生成或修改了實質性內容，勾選「AI assistance used; I reviewed, tested, and understand the submitted changes」。這是誠信聲明，不影響 PR 被接受與否；維護者需要知道是否有人真正理解並驗證過這些變更。

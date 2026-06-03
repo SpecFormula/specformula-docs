@@ -1,0 +1,50 @@
+---
+title: SSOT 與驗證資產
+description: 四層資產分層說明：全域 ADR、Feature SSOT、專案 ADR、benchmark。
+---
+
+specformula-dev-framework 的 SSOT 與驗證資產可以分成四層。同步與實作完成度要看 PR scope、語言狀態與 CI / benchmark 證據；不能把「目前所有語言都完整同步」當成預設事實。
+
+## 四層分層
+
+| 層級 | 位置 | 角色 | 權威性 |
+|---|---|---|---|
+| 全域 ADR | `specs/adr/` | 跨語言規格與架構決策 | 規格決策來源；新決策應避免語言實作細節 |
+| Feature / vocab / terminology | `specs/features/` | 可觀察行為、step vocabulary、跨語言術語映射 | 行為與 feature sync 的 SSOT |
+| 專案 ADR | `specformula-{java,csharp,python,ts}/specs/adr/` | 該語言實作、toolchain、package、合理背離 | 僅在該語言範圍內權威，不能覆蓋全域規格 |
+| Benchmark / tests | `benchmark/` 與各語言 tests | 驗證實作是否符合指定規格或 domain 行為 | 驗證證據；不是規格本身 |
+
+## 「我想知道 X，該讀哪層」
+
+| 問題 | 該讀哪層 |
+|---|---|
+| 這個指令或符號的跨語言語義是什麼 | 全域 ADR + `specs/features/` 對應 feature / vocab |
+| 這個 step 怎麼寫 | 對應 feature file + 同目錄 `vocab.md` |
+| 術語在 Java / C# / Python / TS 會變成什麼 | `specs/features/terminology-dictionary.yml` + `specs/features/terminology-mapping-*.yml` |
+| 為什麼某語言用某個 library / runtime 型別 | 該語言 project ADR 或 package README |
+| Java 跟其他語言行為不一致是誰對 | 先看全域 ADR + Feature SSOT；RI 行為不是自動標準 |
+| 哪些 domain 用到了某指令 | `benchmark/<domain>/` 的 shared specs / feature / isa.yml |
+| 某 PR 是否必須同步所有語言 target | 看 PR scope、修改層級、現有 CI / benchmark 要求；不要把「所有 target 必須同 PR 完成」當成預設事實 |
+
+## 新人推薦閱讀順序
+
+1. 先讀 repo `README.md`，理解 monorepo 內各 package 的狀態。
+2. 讀 `specs/adr/0017-hierarchical-adr-system.md`，理解全域 ADR / project ADR 的分層。
+3. 讀你要修改的 feature / vocab / terminology mapping。
+4. 如果你做語言實作，再讀對應語言的 project ADR 與 package README。
+5. 如果你做 benchmark，再讀該 domain 的 `specs/`、`isa.yml`、runner / adapter README。
+
+## Legacy 提醒
+
+ADR 0000–0016 是 ADR-0017 生效前的全域 ADR，可能帶有早期 Java 實作或 repo 重構脈絡。新撰寫 / 修改規格時，請以目前的全域 ADR、Feature SSOT、terminology mapping 與 ADR-0017 分層原則一起判斷，不要把 legacy ADR 中的語言細節直接當成新規格。
+
+## 四層貫穿範例：`time-control`
+
+| 層 | 對應內容 |
+|---|---|
+| 全域 ADR | ADR-0004（不支援以變數設定時間）、ADR-0005（legacy time type 脈絡，與 Java 耦合，閱讀時注意）、ADR-0006（`now` 可 mock 的 contextual time） |
+| Feature / vocab | `specs/features/isa/instruction/time-control/time-control.feature` 與 `specs/features/isa/instruction/time-control/vocab.md` 定義可觀察行為與句型 |
+| 專案實作 | 各語言以自己的 runtime 型別與測試框架承載時間行為；細節應在 package code / project ADR 中說明 |
+| Benchmark / tests | 各語言 tests 與 benchmark domain 視 scope 使用 `time-control` 或 TIME system；是否涵蓋所有 target 要看該 PR 的驗證目標 |
+
+讀完應該能對應每層責任邊界：規格定「凍結時間與 `now` 相關 expression 的 observable 行為」，各語言決定「用哪個 native 型別 / runtime 機制承載」，benchmark / tests 提供「這個 target 在指定場景中真的符合」的證據。

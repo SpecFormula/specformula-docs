@@ -1,0 +1,96 @@
+---
+title: Python Implementation
+description: specformula-python frameworks, architecture, directory layout, and project ADRs.
+---
+
+`specformula-python` is a uv workspace monorepo; the authoritative merge gate is `ACCEPTANCE.md`. Syncing features and benchmark acceptance are shared steps across languages — see the [Implementer entry](/docs/contributing/implementer).
+
+## Overview
+
+- 6 packages: `specformula-plugin-api` (plugin contract), `specformula-core` (execution core), `specformula-bridge` (bridge layer), `specformula-behave` (BDD), `specformula-dsl` (DSL preprocessing), `specformula-testcontainer` (Testcontainers integration).
+- Framework dependencies: behave (BDD), pytest, basedpyright (strict typing), ruff + import-linter, Hatchling (build), DuckDB (default test DB).
+
+## Architecture
+
+- **Enforced layering**: ruff `banned-api` blocks cross-layer imports (`core` cannot import `bridge` / `behave`); tests are layered too.
+- **Synchronous**: no async / asyncio in core / bridge / behave.
+- **Plugins**: steps are registered dynamically at `before_all` from the instruction list in `isa.yml`.
+- **Time**: `runtime/clock.py` always returns timezone-aware datetimes; the scenario clock is mutable and `before_scenario` resets it.
+
+## Directory layout
+
+```
+specformula-python/
+└─ packages/
+   ├─ specformula-plugin-api/   # plugin contract
+   ├─ specformula-core/src/specformula/core/
+   │  ├─ instructions/   # instructions
+   │  ├─ symbols/        # symbol system
+   │  ├─ specs/          # isa / api / entity readers
+   │  ├─ runtime/        # clock, etc.
+   │  └─ http/
+   ├─ specformula-bridge/        # bridge layer
+   ├─ specformula-behave/src/specformula/behave/   # hooks / matchers / plugin
+   ├─ specformula-dsl/           # DSL preprocessing
+   └─ specformula-testcontainer/ # Testcontainers integration
+```
+
+| Spec concept | Location (prefix `packages/specformula-core/src/specformula/core/`) |
+|---|---|
+| Instructions (api-call, entity-setup, time-control…) | `instructions/` (`api_call.py`, `time_control.py`…) |
+| Symbol system | `symbols/`: `resolver.py` (VAR `$`, capture `>` `<`), `constraints.py` (CAS `&`), `time_expr.py` (TIME `@`), `prefix.py` (`P:` `Q:` `H:` `B:`) |
+| Spec readers | `specs/` (`isa/reader.py`, `api/reader.py`, `entity/reader.py`) |
+| BDD stepdefs / hooks | `packages/specformula-behave/src/specformula/behave/` |
+
+## Environment setup
+
+Python 3.10+ (`.python-version`). Non-DuckDB DB tests need Docker or a compatible container runtime. Pick one of:
+
+**uv (recommended)** — first [install uv](https://docs.astral.sh/uv/getting-started/installation/):
+
+```bash
+cd specformula-python
+uv sync --all-groups        # install all dependency groups
+```
+
+**pip 25.1+** (older pip lacks `--group`):
+
+```bash
+python -m venv .venv && source .venv/bin/activate   # Windows: .venv\Scripts\activate
+pip install -e . --group lint --group typing --group test
+```
+
+After that, run every command (ruff, pytest, behave) inside the venv.
+
+## Build and test
+
+```bash
+uv run --group test behave          # BDD (DuckDB by default, no Docker)
+uv run --group test behave -D db.type=postgresql  # switch DB (needs Docker)
+uv run --group test pytest          # unit
+uv run --group lint ruff format --check   # format (before ruff check)
+uv run --group typing basedpyright  # types
+```
+
+## Gotchas
+
+- Types: PEP 585 / 604 only (`list[...]`, `X | None`), not `typing.List` / `Optional`.
+- Layer isolation: ruff `banned-api` blocks cross-layer imports.
+- Synchronous model: no async, no GIL concerns.
+
+## Project ADRs
+
+Under `specformula-python/specs/adr/`, prefix `python-`:
+
+| ADR | Topic |
+|---|---|
+| `python-0001` | Escaping `.` in JSON path keys |
+| `python-0002` | ISA datasource schema field |
+| `python-0003` | `B:` / `H:` symbol implementation |
+| `python-0004` | Entity JSON path and docstring |
+| `python-0005` | Exception taxonomy |
+| `python-0006` | SSOT / ISA TCK sync conventions |
+| `python-0007` | Plugin architecture (uv workspace, behave) |
+| `python-0008` | DSL preprocess output location |
+
+How to write them: [writing-project-adr](/docs/contributing/implementer/writing-project-adr).

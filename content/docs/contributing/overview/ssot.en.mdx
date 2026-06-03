@@ -1,0 +1,50 @@
+---
+title: SSOT and Verification Assets
+description: "Four-layer asset breakdown: global ADR, Feature SSOT, project ADR, and benchmark."
+---
+
+specformula-dev-framework's SSOT and verification assets are organized into four layers. Sync status and implementation completeness depend on PR scope, the state of each language, and CI / benchmark evidence. Do not assume all languages are fully synchronized.
+
+## Four layers
+
+| Layer | Location | Role | Authority |
+|---|---|---|---|
+| Global ADR | `specs/adr/` | Cross-language specs and architecture decisions | Source of spec decisions; new decisions should avoid language implementation details |
+| Feature / vocab / terminology | `specs/features/` | Observable behavior, step vocabulary, cross-language terminology mapping | SSOT for behavior and feature sync |
+| Project ADR | `specformula-{java,csharp,python,ts}/specs/adr/` | Implementation, toolchain, package, and justified deviations for that language | Authoritative only within that language's scope; cannot override global spec |
+| Benchmark / tests | `benchmark/` and per-language tests | Verify that implementations conform to a given spec or domain behavior | Verification evidence; not the spec itself |
+
+## "I want to know X — which layer do I read?"
+
+| Question | Layer to read |
+|---|---|
+| What is the cross-language semantic of this instruction or symbol? | Global ADR + corresponding feature / vocab in `specs/features/` |
+| How do I write this step? | The corresponding feature file + `vocab.md` in the same directory |
+| What does this term become in Java / C# / Python / TS? | `specs/features/terminology-dictionary.yml` + `specs/features/terminology-mapping-*.yml` |
+| Why does a language use a particular library or runtime type? | That language's project ADR or package README |
+| Java and another language behave differently — which is correct? | Check global ADR + Feature SSOT first; RI behavior is not automatically canonical |
+| Which domains use a given instruction? | `benchmark/<domain>/` shared specs / feature / isa.yml |
+| Does a PR have to sync all language targets? | Check PR scope, the layer being modified, and current CI / benchmark requirements. Do not treat "all targets must be completed in the same PR" as a default |
+
+## Recommended reading order for new contributors
+
+1. Read the repo `README.md` to understand the status of each package in the monorepo.
+2. Read `specs/adr/0017-hierarchical-adr-system.md` to understand the global ADR / project ADR split.
+3. Read the feature / vocab / terminology mapping relevant to what you are changing.
+4. If you are working on a language implementation, read that language's project ADR and package README.
+5. If you are working on benchmark, read that domain's `specs/`, `isa.yml`, and the runner / adapter README.
+
+## Legacy note
+
+ADRs 0000–0016 are global ADRs written before ADR-0017 took effect. They may carry early Java implementation or repo-restructuring context. When writing or modifying specs, evaluate them together with the current global ADRs, Feature SSOT, terminology mapping, and ADR-0017 layering principles. Do not treat language-specific details in legacy ADRs as new spec.
+
+## Four-layer walkthrough example: `time-control`
+
+| Layer | Corresponding content |
+|---|---|
+| Global ADR | ADR-0004 (VAR cannot be used to set time), ADR-0005 (legacy time-type context, Java-coupled — read with care), ADR-0006 (`now` is mockable as contextual time) |
+| Feature / vocab | `specs/features/isa/instruction/time-control/time-control.feature` and `specs/features/isa/instruction/time-control/vocab.md` define observable behavior and step patterns |
+| Project implementation | Each language carries time behavior using its own runtime types and test framework; details belong in the package code / project ADR |
+| Benchmark / tests | Per-language tests and benchmark domains use `time-control` or the TIME system according to the scope of the PR; coverage of all targets depends on the verification goal of that PR |
+
+After reading these four layers you should be able to map each layer's responsibility boundary: the spec defines "the observable behavior of freezing time and `now`-related expressions"; each language decides "which native type / runtime mechanism to use"; benchmark / tests provide evidence that "this target conforms in the specified scenario."
