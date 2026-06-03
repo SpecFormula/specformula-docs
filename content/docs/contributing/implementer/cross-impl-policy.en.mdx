@@ -1,0 +1,67 @@
+---
+title: Cross-Implementation Policy
+description: Rules for maintaining specification consistency across language implementations, grounded in ADR-0017 Strict Deviation Principle.
+---
+
+This is the most important page in the implementer section. specformula-dev-framework has four language implementations (Java, TypeScript, Python, C#), and users expect the same ISA instructions (such as `time-control` and `api-call`) to behave consistently across all of them. But languages differ by nature: time types, async models, and HTTP library conventions vary widely. This page explains how to maintain the balance between "specification purity (consistent behavior)" and "implementation autonomy (idiomatic code)".
+
+## Why this policy exists
+
+ADR-0017 (`specs/adr/0017-hierarchical-adr-system.md`) establishes a two-layer ADR system: global ADRs define What (language-neutral specification decisions), and project ADRs define How (implementation details for each language). This layering is the foundation of all cross-implementation coordination. This page provides the operational rules: when to follow the specification process, when to follow the implementation process, and how to make decisions when there is a divergence.
+
+## Strict Deviation Principle
+
+All language implementations — including the Java RI — must write a project ADR whenever they deviate from the global specification. Java is not exempt from this requirement because it is the Reference Implementation.
+
+This principle comes from `specs/adr/0017-hierarchical-adr-system.md`. Its purpose is to make deviations traceable and reviewable, rather than silently embedded in code.
+
+## Spec defect vs. implementation deviation: triage
+
+When an inconsistency or an inability to conform is discovered during implementation, first determine which category it falls into:
+
+| Situation | Process |
+|---|---|
+| Global spec definition is ambiguous; implementations interpret it differently | Spec defect → Spec-First Correction; go to [spec-author/decision-record](/docs/contributing/spec-author/decision-record) to update the global spec |
+| Global spec is clear, but a technical constraint in the language (GIL, AOT, native type difference) prevents conformance | Implementation deviation → write a project ADR; see [writing-project-adr](/docs/contributing/implementer/writing-project-adr) |
+| Global spec is clear, and the language implementation is simply wrong | Bug → fix it directly |
+| The desired behavior is a language-specific feature unrelated to the global spec | Local extension → project ADR with variance declaration set to `None` |
+
+## Decision table for a slow implementation
+
+| Situation | Action |
+|---|---|
+| Language maintainer is actively working on it | Mark an ETA; temporarily skip the benchmark case and tag it `@unsupported-{lang}` |
+| Language maintainer position is vacant | Open a `help wanted` issue; mark as unsupported |
+| Language maintainer does not think the feature should be supported | Escalate to global ADR discussion; possible outcomes: (a) spec is downgraded to optional / (b) the language drops the feature (mark unsupported and write a project ADR) / (c) find a new maintainer |
+| The spec itself should be downgraded to optional | File a global ADR amendment |
+
+## Benchmark red-light SOP
+
+When a benchmark run shows cross-implementation divergence:
+
+1. **Isolate**: identify which implementation fails which case, and whether it is one implementation or multiple.
+2. **Triage**: apply the "spec defect vs. implementation deviation" table above.
+3. **Assign responsibility**:
+   - Spec defect → spec maintainer handles it (global ADR)
+   - Single-implementation deviation → that language's maintainer handles it (fix the bug or write a project ADR)
+   - Multiple implementations failing simultaneously → suspect a spec defect first
+4. **Temporary downgrade**: if the failure blocks a release, tag the case `@known-failure-{lang}` and open a tracking issue.
+5. **Prohibited**: using RI behavior as the deciding criterion.
+
+The four benchmark domains are: `agent_hr_system`, `ecommerce_platform`, `guessing_game`, and `todo_list`. `todo_list` and `ecommerce_platform` are the primary variant-test scenarios.
+
+## Marking features as unsupported
+
+When a feature is definitively unsupported in a given implementation, mark it in three places:
+
+1. The language project ADR: describe the deviation reason and any workaround in detail.
+2. The corresponding feature file scenario: add the `@unsupported-{lang}` tag.
+3. The language sub-package README: add an entry under the "Limitations" section.
+
+## The RI's position in cross-implementation coordination
+
+- The RI is not an arbiter: when the spec is unclear, RI behavior is not the deciding vote.
+- The RI is a feasibility reference: when writing a new spec, it is reasonable to look at what the RI already does.
+- The RI follows the same governance: Java implementation details still require project ADRs; the Strict Deviation Principle applies to Java equally.
+
+See [Reference Implementation](/docs/contributing/implementer).

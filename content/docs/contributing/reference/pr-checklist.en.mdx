@@ -1,0 +1,97 @@
+---
+title: PR Checklist
+description: Standard self-review checklist before submitting a Pull Request, explaining the intent behind each section of .github/pull_request_template.md.
+---
+
+`.github/pull_request_template.md` is loaded automatically when you open a PR. This page explains the intent behind each section and guides you through self-review before submitting, reducing review round-trips.
+
+## Required checks
+
+### Change type and Scope
+
+Check all applicable items in the template's **Change type** and **Scope** sections. Both allow multiple selections; mark what actually changed — do not under-report or over-report.
+
+### Spec / contract impact
+
+The template's **Spec / contract impact** section requires you to describe the impact on behavior contracts:
+
+- If any behavior changes, fill in where the contract is defined (ADR number or path, feature file, vocab, benchmark fixture).
+- If Java RI validates the new behavior, check the relevant item.
+- If follow-up work is needed (other language implementations not yet updated), list them explicitly.
+
+### Tests / verification
+
+- Run the affected language / module tests.
+- If a benchmark domain is involved, run the corresponding cases (the domain's scenario under `benchmark/`).
+- If any tests were not run, state the reason under "Not run; reason:".
+
+### Documentation
+
+Against the template's **Documentation** section:
+
+- Changes to instructions, symbols, or behavior → update `specs/features/` feature specs, `vocab.md`, `terminology-dictionary.yml`, and the `specformula-docs/` docs reference.
+- Changes to contribution process → update the corresponding `/docs/contributing/` page.
+
+### Compatibility / migration
+
+In the template's **Compatibility / migration** section: for breaking changes, check "Breaking change; migration note included", include a before/after example in the PR description.
+
+### Reviewer assignment
+
+`.github/CODEOWNERS` has not been created yet. Check that the GitHub "Reviewers" field has at least one person assigned; if auto-assignment did not trigger, manually ping the relevant maintainer.
+
+---
+
+## Advanced checks (apply as needed)
+
+### Layer boundary
+
+- Spec PRs must not contain language implementation details (language-neutral check; see [spec-author/executable-spec](/docs/contributing/spec-author/executable-spec)).
+- Project ADR PRs must not silently change global specs; if a spec defect is found, open a separate issue through the Spec-First Correction process.
+
+### Breaking change migration path
+
+The PR description must include a before/after example, and the relevant checkbox in the template's **Compatibility / migration** section.
+
+### Translation impact
+
+Translations are maintained manually. When English docs pages change, note in the PR which translation pages need updating, or mark `stale: true` in the corresponding translation file's frontmatter (see [docs/translation](/docs/contributing/docs/translation)).
+
+### Legacy ADR reference check
+
+- Do not copy the style of ADRs 0000–0016 that mix in language-specific details (see `specs/adr/0005-time-system-outputs-java-time-types.md` as the cautionary case).
+- If the new spec conflicts with a legacy ADR, the PR description must explicitly state the supersession relationship.
+
+---
+
+## PR description format
+
+The template's **Summary** section is free text. Suggested structure:
+
+```markdown
+## Summary
+(One paragraph describing the impact from a user perspective)
+
+## Motivation
+(What problem this solves; link to the relevant issue / ADR)
+
+## Changes
+(List: main code / spec / docs changes)
+
+## Testing
+(How to verify; include reproduction steps if possible)
+
+## Cross-implementation impact
+(If any; list the other language implementations not yet updated)
+
+## Breaking?
+(Yes / No; if yes, include migration path)
+```
+
+Use the template's **Follow-up work** section to list known work intentionally not included in this PR: languages not yet updated, docs still needed, or tracking issues.
+
+---
+
+## AI assistance disclosure
+
+The template includes an **AI assistance** section. If AI tooling generated or substantially modified content in this PR, check "AI assistance used; I reviewed, tested, and understand the submitted changes". This is an integrity statement; it does not affect whether the PR is accepted. Maintainers need to know whether the changes have been genuinely understood and verified by a person.

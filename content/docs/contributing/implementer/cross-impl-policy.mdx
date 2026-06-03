@@ -1,0 +1,67 @@
+---
+title: 跨實作協調政策
+description: 多語言實作的規格一致性規則，以 ADR-0017 Strict Deviation Principle 為基礎。
+---
+
+這份指南是整個 implementer 區段最關鍵的頁。specformula-dev-framework 有四個語言實作（Java、TypeScript、Python、C#），使用者期待相同的 ISA 指令（例如 `time-control`、`api-call`）在所有語言行為一致。但語言天生有差：time type、async model、HTTP lib 慣例各不相同。本頁說明如何在「規格純粹（一致行為）」與「實作自治（idiomatic 寫法）」之間維持平衡。
+
+## 為什麼需要這個 policy
+
+ADR-0017 (`specs/adr/0017-hierarchical-adr-system.md`) 建立兩層 ADR 體系：全域 ADR 定 What（語言中立的規格決策），專案 ADR 定 How（各語言的實作細節）。這個分層是所有跨實作協調的基礎。本頁是執行細則，規定何時走規格流程、何時走實作流程、以及分歧時如何決策。
+
+## Strict Deviation Principle
+
+所有語言實作（含 Java RI）背離全域規格，一律必須寫專案 ADR 記錄。Java 不因為是 Reference Implementation 就免除這項義務。
+
+此原則來自 `specs/adr/0017-hierarchical-adr-system.md`，目的是讓背離行為可被追蹤、可被審查，而不是靜默存在於程式碼中。
+
+## 規格瑕疵 vs 實作背離：分流決策
+
+實作中發現行為不一致或無法達成時，先判斷屬於哪種情況：
+
+| 情境 | 走哪個流程 |
+|---|---|
+| 全域規格定義模糊、各實作各自解讀 | 規格瑕疵 → Spec-First Correction，回 [spec-author/decision-record](/docs/contributing/spec-author/decision-record) 改全域 |
+| 全域規格清楚，但該語言有技術限制（GIL、AOT、native type 差異）無法達成 | 實作背離 → 寫專案 ADR，詳見 [writing-project-adr](/docs/contributing/implementer/writing-project-adr) |
+| 全域規格清楚，該語言實作就是錯 | bug → 直接修 |
+| 想做的事是該語言獨有功能 | 局部擴充 → 專案 ADR，variance declaration 標 `None` |
+
+## 一個實作慢了的決策表
+
+| 情況 | 處置 |
+|---|---|
+| 該語言 maintainer 在跟 | 標記 ETA，benchmark 對應 case 暫時 skip 並標 `@unsupported-{lang}` |
+| 該語言 maintainer 缺人 | 開 `help wanted` issue，標記 unsupported |
+| 該語言 maintainer 不認為該支援 | 升級為全域 ADR 討論，可能 outcome：(a) 規格降為 optional / (b) 該語言放棄該功能（標 unsupported 並寫專案 ADR）/ (c) 換 maintainer |
+| 規格本身要降級為 optional | 走全域 ADR 修正案 |
+
+## Benchmark 紅燈 SOP
+
+benchmark 跑出跨實作差異時，按以下順序處理：
+
+1. **隔離**：確認哪個實作對哪個 case 紅、是多實作同時紅還是單一實作。
+2. **分流**：套用上方「規格瑕疵 vs 實作背離」決策表。
+3. **責任分配**：
+   - 規格瑕疵 → 規格 maintainer 處理（全域 ADR）
+   - 單一實作背離 → 該語言 maintainer 處理（修 bug 或寫專案 ADR）
+   - 多實作同時紅 → 先懷疑規格瑕疵
+4. **暫時降級**：修期間若阻擋 release，可暫時將該 case 標 `@known-failure-{lang}` 並開 issue 追蹤。
+5. **禁止**：以 RI 行為作為判決依據。
+
+四個 benchmark domain 為：`agent_hr_system`、`ecommerce_platform`、`guessing_game`、`todo_list`。其中 `todo_list` 與 `ecommerce_platform` 是主要的變種測試（variant matrix）場景。
+
+## unsupported 標記方式
+
+當某 feature 在某實作確定不支援，需在以下三處標記：
+
+1. 該語言專案 ADR：詳述背離理由與 workaround
+2. 對應 feature 檔的 scenario：加 `@unsupported-{lang}` tag
+3. 該語言 sub-package 的 README：列入「Limitations」段
+
+## RI 在跨實作協調中的位置
+
+- RI 不是仲裁者：規格不清時不以 RI 行為判決。
+- RI 是可行性參考：寫新規格時可參考 RI 已有的解法。
+- RI 也走相同治理：Java 自己的實作細節照樣寫專案 ADR，Strict Deviation Principle 對 Java 同樣適用。
+
+詳見 [Reference Implementation](/docs/contributing/implementer)。

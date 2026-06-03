@@ -1,0 +1,46 @@
+---
+title: Benchmark 概覽
+description: benchmark/ 作為跨實作 conformance gate 的角色、三種 domain 型態，以及目錄結構。
+---
+
+`benchmark/` 用真實業務情境驗證各語言實作的行為一致性。它不是單元測試：單元測試保護單一實作內部，benchmark 跨多語言驗 conformance。
+
+## Benchmark 與 unit test 的差別
+
+| | unit test | benchmark |
+|---|---|---|
+| 範圍 | 單一實作內部模組 | 跨多語言實作 |
+| 用途 | 該語言開發回歸保護 | conformance / 規格驗證 |
+| 失敗意義 | 該語言實作 bug | 規格瑕疵、實作背離，或真 bug（須分流，見 [cross-impl-policy](/docs/contributing/implementer/cross-impl-policy)）|
+
+## 三種 domain
+
+`benchmark/` 下的目錄不是同一種東西：
+
+| domain | 型態 | 內容 |
+|---|---|---|
+| `ecommerce_platform`、`todo_list` | **Adapter conformance** | `specs/`（共用規格）+ `adapter/`（Java-For-All harness）+ 各語言 target；DB-backed，變種多（rust、`java_multi_ds`、audit-plugin） |
+| `guessing_game` | **原生 per-language** | 每個語言目錄各自帶 spec 與測試；無 `adapter/`、無共用 `specs/` |
+| `agent_hr_system` | **示範 app（非 conformance）** | Spring Boot + Next.js + docker-compose 的完整人資系統，展示 SDD 工作流程，不是跨實作 conformance gate |
+
+新增業務情境見 [新增 domain](/docs/contributing/benchmark/adding-domain)；把既有 domain 擴展到新語言見 [新增語言 target](/docs/contributing/benchmark/adding-language)。
+
+## 目錄結構
+
+Adapter conformance domain（以 `ecommerce_platform` 為例）：
+
+```
+benchmark/ecommerce_platform/
+├── specs/              # 共用語言中立規格：features/{isa,dsl}、api/、data/、isa.yml、sync.sh
+├── adapter/            # Java-For-All adapter（Spring Boot：ProxyController + run.sh）
+├── java/               # Java 原生 benchmark（MockMvc）
+├── python/  typescript/  csharp/  rust/   # 各語言 target service
+├── audit-plugin/  ...   # 審計插件變體（含 csharp- / python- 變體）
+└── README.md
+```
+
+原生 per-language domain（`guessing_game`）的各語言目錄自帶 `pom.xml` / spec，沒有 `adapter/` 與共用 `specs/`。
+
+## 怎麼跑
+
+各語言的驗收指令見 [Implementer 共通步驟](/docs/contributing/implementer)；adapter 模式的 `run.sh` 與完整本機流程見 [本機執行](/docs/contributing/benchmark/running-locally)。

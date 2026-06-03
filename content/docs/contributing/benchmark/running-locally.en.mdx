@@ -1,0 +1,40 @@
+---
+title: Running the Benchmark Locally
+description: The two run modes (native per-language and Java-For-All adapter), the absence of a unified all-impl runner, and the failure-narrowing flow.
+---
+
+The benchmark runs one language implementation at a time — there is **no** "run everything and diff" tool. To compare across implementations, run each language separately and see which is green. There are two run modes.
+
+## Mode 1: native per-language
+
+Each `benchmark/<domain>/<lang>/` runs directly with that language's own test framework (Java MockMvc / Python behave / TS cucumber / C# Reqnroll). The command reference is in [Implementer shared steps](/docs/contributing/implementer). For example:
+
+```bash
+cd benchmark/ecommerce_platform/java && mvn test
+cd benchmark/ecommerce_platform/python && behave
+```
+
+`guessing_game` has only this mode (each language directory carries its own spec, no adapter).
+
+## Mode 2: Java-For-All adapter
+
+`ecommerce_platform` and `todo_list` also have an `adapter/`: it uses the Java side's single Spec, HTTP-forwards `api-call` to the target language's service, and runs `entity-setup` / `entity-validate` by connecting to the DB directly from Java. Every language thus passes the exact same Spec, with no test-framework differences.
+
+```bash
+cd benchmark/ecommerce_platform/adapter
+./run.sh --build python           # build the python target image, then run
+./run.sh --expected-failure       # run only the @expected-failure scenarios
+```
+
+Prerequisites: Docker running, Maven installed. Details and the Test Control API contract are in [adding a language target](/docs/contributing/benchmark/adding-language).
+
+## Environment
+
+Which toolchains you need depends on which domain and language you run: the adapter mode needs Java + Maven + Docker; the native mode needs the language's own toolchain (see each [Implementer language page](/docs/contributing/implementer)). `ecommerce_platform` has a rust target and `guessing_game` has a golang target — install those toolchains only if you run them.
+
+## Narrowing down a failure
+
+1. Move the failing scenario into an isolated minimal `.feature`, dropping the other scenarios.
+2. Go step by step to find the first failing step.
+3. Separate the layers: the specformula framework layer (look at that language's step handler) vs. the target service layer (look at the request between the adapter and the service).
+4. Apply the [debugging](/docs/contributing/implementer/debugging) decision tree to decide whether it is a spec problem or an implementation problem.

@@ -1,0 +1,150 @@
+---
+title: Contribution Workflow (SOP)
+description: Five flows — entry, spec update, implementation, benchmark update, and docs update.
+---
+
+import { Tab } from 'fumadocs-ui/components/tabs';
+
+Update the spec (SSOT) before implementing. Implementation and benchmark update are connected; once a feature is done, update docs as needed — docs can also be opened directly as an issue / PR from entry. Click a terminal node to jump tabs.
+
+## The flows
+
+<HashTabs items={["Entry", "Spec update", "Implement", "Benchmark update", "Docs update"]} hashes={["sop-entry", "sop-spec", "sop-impl", "sop-bench", "sop-docs"]}>
+
+<Tab>
+
+```mermaid
+flowchart TD
+    START(["Want to contribute"]) --> Q{"What are you doing?"}
+    Q -->|open issue| ISSUE(["Open issue (report / propose)"])
+    Q -->|discussion| DISC["Discussion to consensus"]
+    Q -->|open PR| Q2{"PR type?"}
+    DISC -->|record| ISSUE
+    DISC -->|implement| Q2
+    Q2 -->|resolve issue| Q3{"Scope?"}
+    Q2 -->|direct PR| Q3
+    Q3 -->|spec| SPEC(["→ Spec update"])
+    Q3 -->|language impl| IMPL(["→ Implement"])
+    Q3 -->|benchmark| BENCH(["→ Benchmark update"])
+    Q3 -->|docs| DOCS(["→ Docs update"])
+    click SPEC href "#sop-spec"
+    click IMPL href "#sop-impl"
+    click BENCH href "#sop-bench"
+    click DOCS href "#sop-docs"
+```
+
+</Tab>
+
+<Tab>
+
+```mermaid
+flowchart TD
+    SPEC["Spec update"] --> Q1{"New capability or change existing?"}
+    Q1 -->|new| Q2{"Which layer?"}
+    Q1 -->|existing| Q3{"bug or enhance?"}
+    Q2 -->|new syntax| BOTH
+    Q2 -->|new feature| BOTH
+    Q2 -->|architecture| ADRONLY
+    Q3 -->|bug| FEAT
+    Q3 -->|enhance| Q4{"Diverges from existing ADR?"}
+    Q4 -->|yes| BOTH
+    Q4 -->|no| FEAT
+    FEAT["update features only"] --> NEXT(["→ Open impl issue"])
+    ADRONLY["add new ADR only"] --> NEXT
+    BOTH["add new ADR + update features"] --> NEXT
+    click NEXT href "#sop-impl"
+    click FEAT href "/docs/contributing/spec-author/executable-spec"
+    click ADRONLY href "/docs/contributing/spec-author/decision-record"
+    click BOTH href "/docs/contributing/spec-author/decision-record"
+```
+
+</Tab>
+
+<Tab>
+
+```mermaid
+flowchart TD
+    IMPL["Impl issue"] --> QADR{"Project ADR needed?"}
+    QADR -->|yes| PADR["Write project ADR"]
+    QADR -->|no| SYNC
+    PADR --> SYNC["Sync global features"]
+    SYNC --> STEP["Implement stepdefs per vocab.md"]
+    STEP --> BDD["BDD loop"]
+    BDD --> QBDD{"BDD passes?"}
+    QBDD -->|no| STEP
+    QBDD -->|yes| QBENCH{"Benchmark exists?"}
+    QBENCH -->|no| TOBENCH(["→ Benchmark update to create it"])
+    QBENCH -->|yes| ACC["Benchmark acceptance"]
+    ACC --> QACC{"Passes?"}
+    QACC -->|no| STEP
+    QACC -->|yes| DONE(["Done"])
+    DONE --> TODOCS(["→ Docs update (as needed)"])
+    click TOBENCH href "#sop-bench"
+    click IMPL href "/docs/contributing/implementer"
+    click PADR href "/docs/contributing/implementer/writing-project-adr"
+    click ACC href "/docs/contributing/benchmark/running-locally"
+    click TODOCS href "#sop-docs"
+```
+
+</Tab>
+
+<Tab>
+
+```mermaid
+flowchart TD
+    B0["Benchmark update"] --> BK{"Which kind of update?"}
+    BK -->|add case / variant to an existing domain| EDIT["edit domain specs<br/>.isa.feature · api · data · isa.yml"]
+    BK -->|add a new domain| NEWD["create a new domain<br/>specs + adapter + README"]
+    BK -->|extend to a new language| NEWL["add a language target service<br/>+ Test Control API + Dockerfile"]
+    EDIT --> SYNC["sync.sh distributes to each target"]
+    NEWD --> SYNC
+    SYNC --> RIV["verify with RI (java/)"]
+    RIV --> ADP["Java-For-All adapter<br/>drives the other languages' targets"]
+    NEWL --> ADP
+    ADP --> BACK(["→ back to impl acceptance"])
+    click BACK href "#sop-impl"
+    click B0 href "/docs/contributing/benchmark"
+    click EDIT href "/docs/contributing/benchmark/conformance-cases"
+    click NEWD href "/docs/contributing/benchmark/adding-domain"
+    click NEWL href "/docs/contributing/benchmark/adding-language"
+    click ADP href "/docs/contributing/benchmark/running-locally"
+```
+
+</Tab>
+
+<Tab>
+
+```mermaid
+flowchart TD
+    DOCS["Docs update"] --> QKIND{"Which kind of docs?"}
+    QKIND -->|in-repo README / CONTRIBUTING / ADR| INREPO["edit with the code, same PR<br/>GitHub-rendered, no build"]
+    QKIND -->|Docs site user / contributor guide| SYNC["edit MDX: zh + en in sync"]
+    SYNC --> PREVIEW["pnpm dev preview, pnpm build verify"]
+    PREVIEW --> SUBPR["submodule PR → parent updates pointer"]
+    INREPO --> DONE(["Done"])
+    SUBPR --> DONE
+    click INREPO href "/docs/contributing/docs/maintaining"
+    click SYNC href "/docs/contributing/docs/translation"
+    click PREVIEW href "/docs/contributing/docs/maintaining"
+    click SUBPR href "/docs/contributing/docs/maintaining"
+```
+
+</Tab>
+
+</HashTabs>
+
+## SSOT
+
+**SSOT = everything in `specs/`**, in two parts:
+
+- **ADR** (decision records): `specs/adr/`
+- **feature** (executable specs): `specs/features/`, containing `vocab.md` and terminology
+
+A spec update is an SSOT update. Features must always stay consistent with ADRs; a global ADR is **immutable** and language-neutral (no implementation) — to revise a decision, add a new ADR that supersedes it.
+
+## Further reading
+
+- Writing specs: [spec-author](/docs/contributing/spec-author)
+- Project ADRs: [implementer/writing-project-adr](/docs/contributing/implementer/writing-project-adr)
+- Benchmark and adding a language target: [benchmark](/docs/contributing/benchmark), [benchmark/adding-language](/docs/contributing/benchmark/adding-language)
+- RI is not the spec; cross-impl triage: [Reference Implementation](/docs/contributing/implementer), [implementer/cross-impl-policy](/docs/contributing/implementer/cross-impl-policy)

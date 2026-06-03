@@ -1,0 +1,61 @@
+---
+title: Conformance Case Format
+description: How benchmark domain conformance cases are organized, coverage, expected-failure, and the split with global ISA features. The ISA syntax itself is in the user docs.
+---
+
+A conformance case is a domain's `*.isa.feature` file that describes a business scenario in that domain's step vocabulary; every language implementation must pass the same case.
+
+The actual ISA syntax is fully documented in the user docs — reference it while contributing rather than repeating it here:
+
+- [The three specs](/docs/gherkin/isa/backend/three-specs) — how Feature + API Spec + Entity Spec compose a case (a step's `summary` maps to the api spec, its `entity` to the entity mapping)
+- [Instructions](/docs/gherkin/isa/backend/instructions) — step formats for `entity-setup`, `api-call`, `response-validate`, `time-control`, etc.
+- [Symbol systems](/docs/gherkin/isa/backend/symbols) — VAR (`$` `>` `<`), CAS (`&`), TIME (`@`)
+- [ISA Config](/docs/gherkin/isa/backend/config) — the `isa.yml` instruction and datasource configuration
+
+This page covers only what is specific to benchmark conformance cases.
+
+## A real case
+
+`ecommerce_platform/specs/features/isa/訂單過期.isa.feature`:
+
+```gherkin
+Feature: 訂單過期
+
+  超過 30 分鐘未付款的訂單由系統批次標記為 EXPIRED。
+  覆蓋 TimeControl 多次推進、正負相對時間（含複合 offset now-1M-2d-1h）、日期篩選。
+
+  Background:
+    Given 現在時間為 "2026-08-01T10:00:00"
+    And 準備一個使用者, with table:
+      | >Owner1.id | name | email               | role       | status |
+      | <userId    | 店主 | owner@ecommerce.com | SHOP_OWNER | ACTIVE |
+
+  Rule: 在付款期限內可成功付款
+
+    Example: 29 分鐘內付款成功
+      When (UID="$Buyer.id") 建立訂單, call table:
+        | >Order1.id | shopId    | items[0].productId | items[0].quantity |
+        | <orderId   | $Shop1.id | $Product1.id       | 1                 |
+      Then 建立訂單(201)回應, with table:
+        | orderId    | status  | paymentDeadline                |
+        | $Order1.id | PENDING | &sameTime(2026-08-01T10:30:00) |
+```
+
+The domain steps (`建立訂單`, `使用者`) are not free text — they come from the domain's api spec `summary` and entity mapping. Before writing a case, check `specs/api/` and `specs/data/<source>/` for the available operations and entities, and align the data table columns to their schema / columns.
+
+## Organizing coverage
+
+A domain is split by **business scenario** (`訂單過期`, `退款申請`, `優惠券`, `出貨追蹤`…), and each `Feature`'s description states plainly what it covers. There is no "every instruction × fixed category" matrix; cover instruction combinations through business scenarios. Multi-datasource (postgres / mysql / mssql) and type coverage have dedicated files (e.g. `型別涵蓋_MySQL`).
+
+## expected-failure
+
+Cases that verify "input the framework should reject is actually rejected" are tagged `@expected-failure` and named `預期失敗_*.isa.feature` (e.g. `預期失敗_CAS語法錯誤`, verifying the framework raises an error on invalid CAS syntax). Framework-level expected-failure cases live separately under `specs/expected-failure/` (`zero-isa-match`, `json-capture-not-allowed`, etc.). The adapter's `./run.sh --expected-failure` runs only these.
+
+## domain case vs. global ISA feature
+
+The two have non-overlapping responsibilities:
+
+- **domain case** (`benchmark/<domain>/specs/features/`): uses instructions within a business scenario, verifying consistent behavior across implementations.
+- **global ISA feature** (`specs/features/isa/instruction/<command>/`): tests the semantics of the instruction itself; the authoritative spec for the instruction's behavior.
+
+To test an instruction's semantics, put it in a global ISA feature; to just use the instruction within a domain scenario, put it in a domain case.

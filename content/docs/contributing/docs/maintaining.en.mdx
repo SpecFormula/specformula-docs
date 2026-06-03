@@ -1,0 +1,78 @@
+---
+title: Doc types and maintenance
+description: The two kinds of docs (the Docs site vs in-repo READMEs), their function and maintenance, and how to run the Docs site locally.
+---
+
+This project has **two kinds of documentation**, with different functions and maintenance — don't mix them:
+
+| | Docs site | In-repo docs |
+|---|---|---|
+| What | a curated, searchable published site | markdown that lives with the code |
+| Where | the `specformula-docs` submodule | each repo / package root |
+| Rendering | Fumadocs build (run locally to see it) | rendered directly by GitHub, no build |
+| Maintenance | edit MDX, go through a submodule PR, follow style-guide / i18n / component conventions | edit in the **same PR as the code**, versioned with it, follow that repo's own conventions |
+| Examples | ISA syntax pages, this contributing guide | package build/test notes, root governance files, ADRs |
+
+---
+
+## Docs site (specformula-docs)
+
+The site you're reading. `specformula-docs` is a **git submodule** of the parent monorepo — its own repo, its own commit history.
+
+### Run it locally
+
+```bash
+# 1. Get the submodule content (if you didn't clone the parent with --recursive)
+git submodule update --init specformula-docs
+
+# 2. Enter the submodule, install, start the dev server
+cd specformula-docs
+pnpm install        # postinstall runs fumadocs-mdx to generate .source
+pnpm dev            # open http://localhost:3000
+```
+
+Requirements: Node 22 (`.nvmrc`), pnpm 10.28. Other commands:
+
+```bash
+pnpm build          # next build; verify it builds before a PR
+pnpm types:check    # fumadocs-mdx + next typegen + tsc --noEmit
+pnpm lint           # eslint
+```
+
+### Submodule maintenance
+
+- **Editing**: the submodule sits at a **detached HEAD** by default, so a direct commit lands on a dangling commit. Branch inside the submodule first, then commit and push to the `specformula-docs` repo.
+- **Linking back to the parent**: after the submodule has a new commit, commit the updated submodule pointer in the parent so the docs version tracks the parent.
+- Don't change submodule content from the parent without committing it in the submodule repo — the pointer would reference a non-existent commit.
+
+### Tech stack and layout
+
+[Fumadocs](https://fumadocs.dev) (`fumadocs-core` / `fumadocs-mdx` / `fumadocs-ui`) + Next.js 16 (Turbopack).
+
+```
+specformula-docs/
+├── content/docs/         # MDX content
+│   ├── gherkin/          # user docs (ISA syntax)
+│   └── contributing/     # this contributing guide
+├── src/
+│   ├── app/              # Next.js App Router
+│   ├── components/       # custom components: mermaid, hash-tabs, language-toggle…
+│   ├── mdx-components.tsx # components registered globally for MDX
+│   └── middleware.ts     # i18n locale handling
+├── source.config.ts      # fumadocs-mdx source config
+└── next.config.mjs
+```
+
+Writing conventions: [Style guide](/docs/contributing/docs/style-guide), [Translation guide](/docs/contributing/docs/translation), [Adding a page](/docs/contributing/docs/adding-pages) — these three apply only to the Docs site.
+
+---
+
+## In-repo docs
+
+Markdown that lives with the code, rendered directly by GitHub and versioned with the code. **Changes ride in the same PR as the code**; they are not moved into, or duplicated on, the Docs site.
+
+- **Root governance**: `README.md`, `CONTRIBUTING.md` (+ `.zh-TW`), `CODE_OF_CONDUCT`, `SECURITY`, `SUPPORT`, `QUICKSTART.md`, `GIT_MESSAGE_GUIDELINES.md`, `PR.md`, `LICENSE.md`.
+- **Per language package**: `specformula-{java,python,csharp,ts}/README.md` (that package's build / test / architecture notes); `specformula-python/` also has `CONTRIBUTING.md` and `ACCEPTANCE.md` (the merge gate).
+- **Specs / benchmark**: `specs/README.md`, `benchmark/<domain>/README.md`, ADRs (`specs/adr/*.md` and per-language project ADRs).
+
+Maintenance rule: change a package's behavior and update that package's README in the same go; governance files (CONTRIBUTING / CoC / SECURITY / SUPPORT) are maintained at the root. The root `CONTRIBUTING.md` is the short GitHub version; the detailed version is this contributing guide on the Docs site — keep them separate, don't push the detailed content back into the root. When the Docs site needs to point at these files, write the path as inline code (e.g. `specs/adr/0017-...md`), not a GitHub URL.

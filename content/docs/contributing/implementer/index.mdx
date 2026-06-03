@@ -1,0 +1,66 @@
+---
+title: Implementer
+description: 把語言中立規格落實到某一個語言的入口與標準流程。
+---
+
+Implementer 把語言中立的規格（SSOT）落實到某一個語言。一次只做一個語言；RI（Java）與其他語言走相同流程，只在進 benchmark 驗收前有分歧。
+
+## 標準流程
+
+1. **判斷要不要專案 ADR** — 需要語言層級決策（lib、toolchain、效能、語言特性 workaround）就先寫 [專案 ADR](/docs/contributing/implementer/writing-project-adr)；純照規格實作就跳過。
+2. **同步全域 features** — 對齊 `specs/features/` 最新的 feature 與 `vocab.md`。
+3. **依 vocab.md 實作 stepdef** — 照句型表把每個 step 接到該語言的實作。
+4. **BDD loop** — 跑該語言 BDD，紅了改 stepdef / 實作，直到全綠。
+5. **benchmark 驗收** — 對 benchmark domain 跑 conformance。新功能若還沒有對應 benchmark，先走 [benchmark 更新](/docs/contributing/benchmark) 用 RI 建立，再回來驗收。
+
+流程圖見 [貢獻流程 SOP](/docs/contributing/lifecycle#sop-impl)。
+
+## 共通步驟（各語言通用）
+
+下面兩步每個語言概念相同，只有指令的語言參數不同。
+
+### 同步全域 features
+
+全域 `specs/features/` 是唯讀來源。用根目錄腳本把它鏡射進該語言專案的測試目錄（會套用 terminology mapping）；鏡射出來的檔案不要手改，要改規格回 [spec-author](/docs/contributing/spec-author)。
+
+```bash
+./scripts/sync-global-features.sh <java|typescript|python|csharp>
+./scripts/sync-global-features.sh java --dry-run   # 先預覽差異
+```
+
+### benchmark 驗收
+
+對 benchmark domain 跑 conformance，全綠才算通過。各 domain 的規格先用該 domain 的 `specs/sync.sh --<lang>` 同步到 target，再跑該語言的驗收：
+
+| 語言 | 驗收跑法（以 `ecommerce_platform` 為例） |
+|---|---|
+| Java | `cd benchmark/ecommerce_platform/java && mvn test` |
+| TypeScript | `cd benchmark/ecommerce_platform/typescript && pnpm install && pnpm build && pnpm start`（啟動 target service） |
+| Python | `cd benchmark/ecommerce_platform/python && behave` |
+| C# | `cd benchmark/ecommerce_platform/csharp && dotnet test test/EcommercePlatform.Tests/…` |
+
+新功能還沒有對應 benchmark 時，先走 [benchmark 更新](/docs/contributing/benchmark) 用 RI 建立。
+
+## 你會碰到的資料夾
+
+- `specformula-{ts,java,python,csharp}/` — 各語言實作，各含其 `specs/adr/`（專案 ADR）
+- `specs/features/` — 規格來源（唯讀；要改走 [spec-author](/docs/contributing/spec-author)）
+- `benchmark/` — conformance 驗收
+
+## 語言頁
+
+- [TypeScript](/docs/contributing/implementer/ts)
+- [Java（RI）](/docs/contributing/implementer/java)
+- [Python](/docs/contributing/implementer/python)
+- [C#](/docs/contributing/implementer/csharp)
+
+## RI 與其他語言的差別
+
+`specformula-java` 是 [Reference Implementation](/docs/contributing/implementer)，額外負責：新全域 ADR 的可行性驗證、首發 conformance benchmark、語言中立自我審查（Java 自己的 Spring / Jackson 等細節一律寫進專案 ADR）。
+
+但 **RI 行為不等於規格**：Java 與規格不一致時 Java 是 bug，對齊基準永遠是全域 ADR + feature，不是 Java 行為。
+
+## 跨實作分歧 / 除錯
+
+- 一致性規則與分流決策（規格瑕疵 vs 實作背離）：[cross-impl-policy](/docs/contributing/implementer/cross-impl-policy)
+- benchmark 紅了怎麼查：[debugging](/docs/contributing/implementer/debugging)

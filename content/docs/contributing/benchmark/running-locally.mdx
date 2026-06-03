@@ -1,0 +1,40 @@
+---
+title: 本機執行 Benchmark
+description: 兩種執行模式（原生 per-language 與 Java-For-All adapter），以及失敗時的縮小範圍流程。
+---
+
+benchmark 一次跑一個語言實作——**沒有**「一鍵跑全部實作並 diff」的工具。要比對跨實作差異，就分別跑各語言、各自看綠不綠。執行分兩種模式。
+
+## 模式一：原生 per-language
+
+每個 `benchmark/<domain>/<lang>/` 用該語言自己的測試框架直接跑（Java MockMvc / Python behave / TS cucumber / C# Reqnroll）。指令對照見 [Implementer 共通步驟](/docs/contributing/implementer)。例如：
+
+```bash
+cd benchmark/ecommerce_platform/java && mvn test
+cd benchmark/ecommerce_platform/python && behave
+```
+
+`guessing_game` 只有這個模式（各語言目錄自帶 spec，無 adapter）。
+
+## 模式二：Java-For-All adapter
+
+`ecommerce_platform` 與 `todo_list` 另有 `adapter/`：用 Java 端的同一份 Spec，透過 HTTP 把 `api-call` 轉發到被測語言的 service，`entity-setup` / `entity-validate` 由 Java 直連 DB。這樣所有語言過完全相同的 Spec，沒有測試框架差異。
+
+```bash
+cd benchmark/ecommerce_platform/adapter
+./run.sh --build python           # build python target image 再跑
+./run.sh --expected-failure       # 只跑標記 @expected-failure 的 scenario
+```
+
+前置：Docker 運行中、Maven 已安裝。細節與 Test Control API 契約見 [新增語言 target](/docs/contributing/benchmark/adding-language)。
+
+## 環境準備
+
+需要哪些 toolchain 取決於要跑哪個 domain 的哪個語言：adapter 模式要 Java + Maven + Docker；原生模式要該語言自己的 toolchain（見各 [Implementer 語言頁](/docs/contributing/implementer)）。`ecommerce_platform` 有 rust target、`guessing_game` 有 golang target，跑到才需要對應 toolchain。
+
+## 失敗了怎麼縮小範圍
+
+1. 把失敗的 scenario 移到隔離的最小 `.feature`，移掉其他 scenario。
+2. 逐 step 找第一個失敗的 step。
+3. 分清層級：specformula 框架層（看該語言的 step handler）還是 target service 層（看 adapter 與 service 間的 request）。
+4. 套 [debugging](/docs/contributing/implementer/debugging) 的決策樹，判斷規格問題還是實作問題。

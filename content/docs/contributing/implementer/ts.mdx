@@ -1,0 +1,83 @@
+---
+title: TypeScript 實作
+description: specformula-ts 的框架依賴、架構設計、目錄結構與專案 ADR。
+---
+
+`specformula-ts` 是 pnpm workspace monorepo。同步 features 與 benchmark 驗收是各語言共通步驟，見 [Implementer 入口](/docs/contributing/implementer)。
+
+## 概覽
+
+- 6 個 package：`plugin-api`（契約）、`core`（指令 / 符號 / spec / dialect）、`dsl`、`node`、`cucumber`（stepdef）、`testcontainer`；以 TypeScript composite project references 串接，`tsc -b` 增量建置。
+- 框架依賴：cucumber-js（透過 `tsx` 跑 TS）、Vitest、luxon 3、`@readme/openapi-parser` + ajv、`decimal.js-light`、raw DB driver（`pg` / `mysql2` / `better-sqlite3` / `mssql`）。
+
+## 架構設計
+
+- **顯式 registry**：`InstructionRegistry` / `LifecycleHookRegistry` / `SpecReaderRegistry`（`ts-0010`）；step 由 `@specformula/cucumber` import 時自動註冊。
+- **scenario context**：`AsyncLocalStorage`（fallback Cucumber World，`ts-0005`）。
+- **DB**：無 ORM，dialect 抽象 + raw driver；H2 相容用 `better-sqlite3`（`ts-0006`）。
+- **全 ESM**：`"type": "module"`、`moduleResolution: nodenext`、`verbatimModuleSyntax`。
+
+## 目錄結構
+
+```
+specformula-ts/
+└─ packages/
+   ├─ plugin-api/      # 契約 / registry 介面
+   ├─ core/src/        # instruction / helper / spec / dialect
+   ├─ dsl/             # DSL 編譯
+   ├─ node/            # Node 執行環境
+   ├─ cucumber/        # stepdefinitions
+   └─ testcontainer/
+```
+
+| 規格概念 | 位置（前綴 `packages/core/src/`） |
+|---|---|
+| 指令（api-call、entity-setup、time-control…） | `instruction/`（`ApiCall.ts`、`TimeControl.ts`…） |
+| 符號系統 | `helper/`：`SymbolResolver.ts`（VAR `$` `>` `<`）、`ConstraintEngine.ts`（CAS `&`）、`TimeService.ts`（TIME `@`） |
+| spec reader | `spec/`（`IsaSpecReader.ts`、`EntityDdlReader.ts`、`ApiSpecReader.ts`） |
+| BDD stepdef | `packages/cucumber/src/stepdefinitions/`（18 檔） |
+
+## 環境安裝
+
+- Node.js 22（`.nvmrc`，可 `nvm use`）。
+- pnpm 10.28（`package.json` 的 `packageManager`；`corepack enable` 會自動取用）。
+- Docker 或相容容器 runtime：跑 DB（Testcontainers）測試需要。
+
+```bash
+pnpm install   # 安裝依賴
+```
+
+## 建置與測試
+
+TypeScript 5.7。
+
+```bash
+pnpm build        # tsc -b（6 composite package）
+pnpm typecheck
+pnpm test:unit    # Vitest
+pnpm test:bdd     # cucumber-js（isa / spec-error / dsl）
+pnpm lint         # ESLint（typescript-eslint）
+```
+
+## 常見 gotcha
+
+- ESM：import 帶副檔名（`./x.js`）；型別用 `import type`；測試以 `--import tsx` 跑 TS。
+- 時間：禁用原生 `Date` 處理時區，一律 luxon 3，包成 `DateTimeTZ` / `DateOnly` / `TimeOnly`；mock clock 用 `TimeService.setNow()`。
+- 數值精度：DECIMAL 走字串 + `decimal.js-light`，避開 IEEE 754（`ts-0008`）。
+
+## 專案 ADR
+
+位置 `specformula-ts/specs/adr/`，前綴 `ts-`：
+
+| ADR | 主題 |
+|---|---|
+| `ts-0001` | Time value objects（luxon） |
+| `ts-0004` | DB driver 抽象（raw driver） |
+| `ts-0005` | Async context（AsyncLocalStorage） |
+| `ts-0006` | H2 相容（better-sqlite3） |
+| `ts-0007` | OpenAPI parser 與 schema 驗證 |
+| `ts-0008` | 數值精度（字串 DECIMAL） |
+| `ts-0009` | 移除 drizzle-orm |
+| `ts-0010` | Plugin 架構 |
+
+寫法見 [writing-project-adr](/docs/contributing/implementer/writing-project-adr)。

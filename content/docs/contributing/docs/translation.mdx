@@ -1,0 +1,21 @@
+---
+title: 翻譯指南
+description: 文件的語言政策——中英兩版同步更新、同一個 PR 一起發布。
+---
+
+## 語言政策
+
+每頁文件都有中文（zh-TW）與英文（en）兩版。**任何內容變更都要同時更新兩版、在同一個 PR 一起發布**，不留「只改了一種語言」的已發布狀態。因此兩版永遠對應同一次變更，沒有誰落後誰、要不要標 stale 的問題。
+
+第三語言目前不開放，避免長期停在半翻譯狀態。
+
+## 同步發布
+
+- 改一頁的 `page.mdx`，就一起改它的 `page.en.mdx`（反之亦然），兩檔放同一個 PR。
+- 新增頁面同理：`page.mdx` + `page.en.mdx` 一起進，`meta.json` + `meta.en.json` 也一起更新（見 [新增文件頁面](/docs/contributing/docs/adding-pages)）。
+- review 時兩版一起看，不要先 merge 一種語言、之後再補另一種。
+
+## 翻譯一致性
+
+- 指令名、符號、路徑、ADR 編號、程式碼區塊、檔名不翻譯，中英保持一致（如 `api-call`、`specs/features/`、`lang:Java`）。
+- 中文用語以既有頁面與 [文件風格指南](/docs/contributing/docs/style-guide) 為準，不自創同義詞。

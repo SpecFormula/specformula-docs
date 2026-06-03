@@ -1,0 +1,6 @@
+{
+  "title": "Contributing",
+  "description": "How to contribute specs, implementations, benchmarks, and docs",
+  "root": true,
+  "pages": ["index", "lifecycle", "overview", "spec-author", "implementer", "benchmark", "docs", "reference"]
+}

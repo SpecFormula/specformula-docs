@@ -1,0 +1,71 @@
+---
+title: Adding documentation pages
+description: How to choose a section, name files, set up i18n pairs, and register pages in the sidebar for specformula-docs.
+---
+
+This page explains how to decide which section a new page belongs to, the file naming convention, how Chinese and English files pair together, and how to register a page in the sidebar.
+
+## Choosing a section
+
+The sections currently under `specformula-docs/content/docs/` are:
+
+| Section | Route prefix | Purpose |
+|---|---|---|
+| `gherkin/` | `/docs/gherkin/...` | ISA specification docs (instructions, symbols, types, etc.) |
+| `contributing/` | `/docs/contributing/...` | This contributor guide |
+
+Other sections — reference, tutorial, concepts, changelog — do not exist yet. If they are added in the future, that will be documented then. Do not add links pointing to them from existing pages. If you are unsure which section a new page belongs to, open a Discussion first to avoid creating an unplanned section.
+
+## Creating a page
+
+Path format for a new page:
+
+```
+specformula-docs/content/docs/{section}/{kebab-case-page}.mdx
+```
+
+Required frontmatter on every page:
+
+```yaml
+---
+title: Page title
+description: One sentence — used for OG cards and search snippets.
+---
+```
+
+## i18n file pairs
+
+This repo uses zh-TW as the default locale. Files exist in pairs within each section directory.
+
+| Locale | Filename | Example |
+|---|---|---|
+| zh-TW (default) | `{page}.mdx` | `adding-pages.mdx` |
+| English | `{page}.en.mdx` | `adding-pages.en.mdx` |
+
+The sidebar and route metadata for each directory are controlled by `meta.json` (zh-TW) and `meta.en.json` (English). Each file maintains its own `pages` array manually. After adding a new page, add the page name (without extension) to the `pages` array in both `meta.json` and `meta.en.json` for the target directory.
+
+The repo does not use a `content/zh-TW/...` directory tree.
+
+## Cross-linking to existing pages
+
+Use Fumadocs absolute route paths (no file extension) for internal links:
+
+```
+[glossary](/docs/contributing/overview/glossary)
+[TIME system](/docs/gherkin/isa/backend/symbols/time)
+```
+
+Do not use relative paths (`../`) for cross-section links — they can resolve incorrectly under i18n locale prefixes.
+
+Do not link to glossary anchors (`#term`); link to the page path `/docs/contributing/overview/glossary` directly.
+
+When referencing files in the parent repo (ADRs, specs, scripts), render them as inline code rather than hyperlinks:
+`specs/adr/0017-hierarchical-adr-system.md`, `scripts/sync-global-features.sh`. Do not use GitHub URLs — branch URLs break after a release.
+
+## Sidebar and index checklist
+
+After a page is merged, verify:
+
+- The page appears in the sidebar (controlled by the `pages` array in `meta.json` / `meta.en.json` — maintained manually).
+- Site search returns the page.
+- Prev/next navigation links work correctly.

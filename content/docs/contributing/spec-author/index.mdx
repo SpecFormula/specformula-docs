@@ -1,0 +1,23 @@
+---
+title: Spec Author
+description: 維護語言中立規格（SSOT）的入口；只產出決策紀錄與可執行規格兩種。
+---
+
+Spec Author 維護語言中立的規格（SSOT），只產出**兩種**貢獻：
+
+1. **[決策紀錄（ADR）](/docs/contributing/spec-author/decision-record)** — 記錄跨語言的規格 / 架構決策。
+2. **[可執行規格（feature）](/docs/contributing/spec-author/executable-spec)** — `specs/features/` 的 feature 檔、`vocab.md`、terminology，定義可觀察行為。
+
+## 你會碰到的資料夾
+
+- `specs/adr/` — 全域 ADR（決策紀錄）。
+- `specs/features/` — feature 檔、`vocab.md`、terminology dictionary / mapping。
+
+## 你不會主動改
+
+- `specformula-{lang}/`（各語言實作與其專案 ADR）。
+- `benchmark/` 的 target service 與 adapter。
+
+## 新增一個符號 / 指令會同時用到兩種
+
+定義一個新符號或指令，**決策**進 ADR（語言中立的語義、語法、錯誤合約），**可執行規格**進 feature + `vocab.md`。兩種一起，不能只做一邊；feature 永遠要跟 ADR 一致。

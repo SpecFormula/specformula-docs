@@ -1,0 +1,48 @@
+---
+title: Label 系統
+description: specformula-dev-framework 在 GitHub 上實際使用的 label，以及 triage 慣例。
+---
+
+以下是 repo 目前實際設定的 label（`gh label list`）。語言用 `lang:` 前綴，其餘是扁平的類型 / 狀態 label，沒有 `T-` / `A-` 之類的軸。
+
+## 語言實作
+
+| Label | 對應 |
+|---|---|
+| `lang:Java` | `specformula-java`（Reference Implementation） |
+| `lang:Python` | `specformula-python` |
+| `lang:CSharp` | `specformula-csharp` |
+| `lang:TypeScript` | `specformula-ts` |
+| `lang:Rust` | Rust（目前僅 benchmark target） |
+
+## 類型
+
+| Label | 含義 |
+|---|---|
+| `bug` | 行為不符預期 |
+| `enhancement` | 新功能 / 改進 |
+| `documentation` | 文件 |
+| `architecture` | 關鍵架構決策與紀錄（ADR 類） |
+| `benchmark` | 新增 benchmark |
+| `release` | release / 部署相關 |
+| `testing` | 補測試、修測試 |
+
+## 狀態 / 流程
+
+| Label | 含義 |
+|---|---|
+| `Draft` | 尚未完整立案的草稿 |
+| `good first issue` | 適合新手 |
+| `help wanted` | 需要更多人手 |
+| `question` | 需要更多資訊 |
+| `duplicate` / `invalid` / `wontfix` | GitHub 內建處置 |
+
+## issue 模板帶的 label
+
+開 issue 時模板的 `labels:` 欄會預先帶上對應 label，並一律加 `needs-triage`（bug→`bug`、規格/功能提案→`proposal`、文件→`documentation`、CI/release→`ci`+`release`、架構重構→`refactoring`+`architecture`）。其中 `needs-triage` / `proposal` / `ci` / `refactoring` 若 repo 尚未建立，需先建 label 才會生效。詳見 [issue-templates](/docs/contributing/reference/issue-templates)。
+
+## Triage 慣例
+
+1. 新 issue 進來，maintainer 視情況補上語言（`lang:`）與類型 label，並移除 `needs-triage`。
+2. 重複或已知 → 標 `duplicate` 並連回原 issue，然後 close。
+3. 入手難度用 GitHub 內建 `good first issue`。

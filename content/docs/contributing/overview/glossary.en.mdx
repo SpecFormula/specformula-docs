@@ -1,0 +1,85 @@
+---
+title: Glossary
+description: Definitions of common terms for contributors to specformula-dev-framework, grouped by category.
+---
+
+Terms are grouped by category: instructions, symbols, spec & SSOT, the ADR system, benchmark & verification, and roles & implementations. Each entry provides a definition and a concrete example. Internal links point to the relevant deep page; repo file paths are rendered as inline code, not hyperlinks.
+
+## Instructions
+
+| Term | Definition | Example |
+|---|---|---|
+| Command / Instruction | An executable unit within the ISA, typically named in kebab-case. | `api-call`, `entity-setup`, `time-control` |
+| `api-call` | ISA instruction that assembles and executes an HTTP API call according to the ApiSpec. | `specs/features/isa/instruction/api-call/` |
+| `entity-setup` | ISA instruction that establishes test data or table preconditions. | `specs/features/isa/instruction/entity-setup/` |
+| `entity-validate` | ISA instruction that validates the state of a database entity. | `specs/features/isa/instruction/entity-validate/` |
+| `entity-non-existence-validate` | ISA instruction that asserts the non-existence of a record. | `specs/features/isa/instruction/entity-non-existence-validate/` |
+| `response-validate` | ISA instruction that validates API response status, headers, body, or symbol captures. | `specs/features/isa/instruction/response-validate/` |
+| `time-control` | ISA instruction that controls the current time within a test scenario. | `specs/features/isa/instruction/time-control/time-control.feature` |
+
+## Symbols
+
+| Term | Definition | Example |
+|---|---|---|
+| Symbol | The symbol systems: VAR (`$`) / CAS (`&`) / TIME (`@`) / VAR capture (`>` `<`). | `$user.email`, `&eq(100)`, `@time(now)` |
+| VAR (`$`) | The variable resolution / interpolation symbol system. | `$session_id`, `${name}` |
+| CAS (`&`) | Constraint Assertion System, the constraint-assertion symbol system. | `&eq(100)`, `&gt(0)` |
+| TIME (`@`) | The time-expression symbol system. | `@time(now)`, `@date(2026-05-29)` |
+| VAR capture (`>` `<`) | Field syntax that captures a value from a response or execution variable into the test context. | `>agentId` paired with `<id` |
+
+## Spec & SSOT
+
+| Term | Definition | Example |
+|---|---|---|
+| ISA (Instruction Set Architecture) | The framework layer SpecFormula uses to describe BDD test flows, defining the instruction set and symbol system with observable semantics. | `isa.yml`, `specs/features/isa/` |
+| Spec | The full collection of SpecFormula spec assets: ADRs, Feature SSOT, vocab, terminology dictionary / mapping. | `specs/` |
+| SSOT | Single Source of Truth = everything in `specs/`: ADRs (decision records) and features (executable specs, including `vocab.md` / terminology); benchmark is verification evidence, not SSOT. | `specs/adr/`, `specs/features/` |
+| Feature | A `.feature` file; a BDD executable spec. | `specs/features/isa/instruction/time-control/time-control.feature` |
+| Scenario | A single test case within a feature file. | `Scenario: Query after freezing time` |
+| Formula | The conceptual word in the SpecFormula project name. Do not treat it as a separate spec layer in documentation. | — |
+
+## ADR system
+
+| Term | Definition | Example |
+|---|---|---|
+| ADR | Architectural Decision Record. Split into global and project layers. | `specs/adr/0017-hierarchical-adr-system.md` |
+| Global-level ADR | Located in `specs/adr/`; defines cross-language specs or architecture decisions. | ADR-0017 |
+| Project-level ADR | Located in `specformula-{lang}/specs/adr/`; defines implementation, toolchain, and package decisions for that language. | `specformula-java/specs/adr/java-0006-plugin-architecture-implementation.md` |
+| Legacy ADR | Global ADRs 0000–0016, written before ADR-0017 took effect. May contain early Java implementation or repo-restructuring context; interpret them against the current SSOT. | ADR-0005 |
+| Variance declaration | A statement in a project ADR marking which global ADR it references or deviates from. Exact format follows ADR-0017 and each language's ADR conventions. | `> **Reference baseline**: ADR-0012` |
+| Spec-First Correction | When an implementation reveals a spec defect, the fix belongs in the global spec or Feature SSOT, not only in the language package. | ADR-0017 |
+| Strict Deviation Principle | A language implementation that deviates from global spec must record the deviation with justification. | ADR-0017 |
+| Vertical Traceability | Project ADRs should trace back to the global spec context rather than citing only other language implementations, which would create de-facto standards by horizontal reference. | ADR-0017 |
+
+## Benchmark & verification
+
+| Term | Definition | Example |
+|---|---|---|
+| Benchmark | Verification assets consisting of real domains, fixtures, target services, adapters, and language runners. Provides cross-target evidence; does not imply every PR must run all languages. | `benchmark/todo_list/`, `benchmark/ecommerce_platform/` |
+| Domain | A set of business scenarios and fixtures within the benchmark. | `ecommerce_platform`, `todo_list`, `guessing_game`, `agent_hr_system` |
+| Conformance | Behavioral consistency of a target against a given spec or benchmark case. Scope matters: single language, single domain, or cross-target. | Java `specformula-core` tests pass; `todo_list` adapter E2E passes |
+| Target service | The service or application under test within a benchmark domain. | `benchmark/ecommerce_platform/*`, `benchmark/todo_list/*` |
+| Adapter | The bridge layer between a benchmark target service and the SpecFormula runner. Some domains use an adapter; some language targets run native tests directly. | `benchmark/ecommerce_platform/adapter/` |
+
+## Roles & implementations
+
+| Term | Definition | Example |
+|---|---|---|
+| Spec author | A contributor who writes global ADRs, features, vocab, and terminology. | — |
+| Implementer | A maintainer or contributor for a language implementation. | Developers of `specformula-java`, `specformula-csharp` |
+| Reference Implementation (RI) | The reference implementation used to verify spec feasibility; currently `specformula-java`. RI behavior does not equal spec. | — |
+| LSP plugin | Language Server Protocol integration direction. Not a primary contribution path at this time. | `specformula-lsp-plugin/` |
+
+## Easily confused pairs
+
+**spec vs feature**: "spec" refers to the full collection of spec assets (ADRs, features, vocab, terminology); "feature" refers specifically to a BDD executable spec file (`.feature`).
+
+**instruction vs symbol**: An instruction is an ISA step / command capability (e.g. `api-call`, `time-control`); a symbol is a syntax prefix for value resolution or assertion (`$`, `&`, `@`, `>`, `<`).
+
+**benchmark domain vs target service**: A domain is a set of business scenarios and verification assets; a target service is the specific application under test within that domain. Not every domain has the same set of languages or the same adapter shape.
+
+**formula vs expression**: "Formula" is the conceptual word in the project name; "expression" refers to a specific syntax construct (e.g. `@time(now-1h)`, `&eq(100)`).
+
+**Global ADR vs project ADR**: Global ADRs define cross-language specs and architecture direction; project ADRs define how a specific language carries and implements them. For example: "what is the observable behavior of `time-control` after freezing time" is global; "whether C# uses `DateTimeOffset` or another type" is a project decision.
+
+**RI vs spec**: The RI is a reference implementation; the spec is the normative definition. Undefined behavior in the RI does not automatically become canonical spec. See [Reference Implementation](/docs/contributing/implementer).

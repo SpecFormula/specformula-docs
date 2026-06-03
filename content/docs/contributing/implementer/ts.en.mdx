@@ -1,0 +1,83 @@
+---
+title: TypeScript Implementation
+description: specformula-ts frameworks, architecture, directory layout, and project ADRs.
+---
+
+`specformula-ts` is a pnpm workspace monorepo. Syncing features and benchmark acceptance are shared steps across languages — see the [Implementer entry](/docs/contributing/implementer).
+
+## Overview
+
+- 6 packages: `plugin-api` (contract), `core` (instructions / symbols / spec / dialect), `dsl`, `node`, `cucumber` (stepdefs), `testcontainer`; wired with TypeScript composite project references, incremental `tsc -b`.
+- Framework dependencies: cucumber-js (runs TS via `tsx`), Vitest, luxon 3, `@readme/openapi-parser` + ajv, `decimal.js-light`, raw DB drivers (`pg` / `mysql2` / `better-sqlite3` / `mssql`).
+
+## Architecture
+
+- **Explicit registries**: `InstructionRegistry` / `LifecycleHookRegistry` / `SpecReaderRegistry` (`ts-0010`); steps auto-register when `@specformula/cucumber` is imported.
+- **Scenario context**: `AsyncLocalStorage` (fallback Cucumber World, `ts-0005`).
+- **DB**: no ORM, a dialect abstraction over raw drivers; H2 compatibility via `better-sqlite3` (`ts-0006`).
+- **All ESM**: `"type": "module"`, `moduleResolution: nodenext`, `verbatimModuleSyntax`.
+
+## Directory layout
+
+```
+specformula-ts/
+└─ packages/
+   ├─ plugin-api/      # contract / registry interfaces
+   ├─ core/src/        # instruction / helper / spec / dialect
+   ├─ dsl/             # DSL compilation
+   ├─ node/            # Node runtime
+   ├─ cucumber/        # stepdefinitions
+   └─ testcontainer/
+```
+
+| Spec concept | Location (prefix `packages/core/src/`) |
+|---|---|
+| Instructions (api-call, entity-setup, time-control…) | `instruction/` (`ApiCall.ts`, `TimeControl.ts`…) |
+| Symbol system | `helper/`: `SymbolResolver.ts` (VAR `$` `>` `<`), `ConstraintEngine.ts` (CAS `&`), `TimeService.ts` (TIME `@`) |
+| Spec readers | `spec/` (`IsaSpecReader.ts`, `EntityDdlReader.ts`, `ApiSpecReader.ts`) |
+| BDD stepdefs | `packages/cucumber/src/stepdefinitions/` (18 files) |
+
+## Environment setup
+
+- Node.js 22 (`.nvmrc`, `nvm use`).
+- pnpm 10.28 (`package.json` `packageManager`; `corepack enable` picks it up automatically).
+- Docker or a compatible container runtime: required to run the DB (Testcontainers) tests.
+
+```bash
+pnpm install   # install dependencies
+```
+
+## Build and test
+
+TypeScript 5.7.
+
+```bash
+pnpm build        # tsc -b (6 composite packages)
+pnpm typecheck
+pnpm test:unit    # Vitest
+pnpm test:bdd     # cucumber-js (isa / spec-error / dsl)
+pnpm lint         # ESLint (typescript-eslint)
+```
+
+## Gotchas
+
+- ESM: imports need the extension (`./x.js`); use `import type` for types; tests run TS via `--import tsx`.
+- Time: native `Date` is not used for timezones — luxon 3 throughout, wrapped as `DateTimeTZ` / `DateOnly` / `TimeOnly`; mock clock via `TimeService.setNow()`.
+- Numeric precision: DECIMAL compared as strings + `decimal.js-light`, avoiding IEEE 754 (`ts-0008`).
+
+## Project ADRs
+
+Under `specformula-ts/specs/adr/`, prefix `ts-`:
+
+| ADR | Topic |
+|---|---|
+| `ts-0001` | Time value objects (luxon) |
+| `ts-0004` | DB driver abstraction (raw drivers) |
+| `ts-0005` | Async context (AsyncLocalStorage) |
+| `ts-0006` | H2 compatibility (better-sqlite3) |
+| `ts-0007` | OpenAPI parser and schema validation |
+| `ts-0008` | Numeric precision (string DECIMAL) |
+| `ts-0009` | Dropping drizzle-orm |
+| `ts-0010` | Plugin architecture |
+
+How to write them: [writing-project-adr](/docs/contributing/implementer/writing-project-adr).

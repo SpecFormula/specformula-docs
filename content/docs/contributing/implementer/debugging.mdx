@@ -1,0 +1,53 @@
+---
+title: 跨實作除錯
+description: 跨語言實作的失敗模式分類、決策樹，以及規格歧義的上報方式。
+---
+
+當 benchmark 出現跨實作差異，或某個語言實作行為不符預期，本頁是動手排查的起點：分類失敗模式、判斷規格問題還是實作問題、上報規格歧義。分流的權威規則與責任歸屬見 [cross-impl-policy](/docs/contributing/implementer/cross-impl-policy)。
+
+## 常見失敗模式分類
+
+| 類別 | 徵狀 | 第一步 |
+|---|---|---|
+| 規格歧義 | 多實作同時與規格參考有同方向偏離 | 讀全域 ADR + feature 檔，找模糊處；可能要走 Spec-First Correction |
+| 單一實作 bug | 只有單一語言實作紅 | 該語言 maintainer 處理；確認規格 case 是合理的 |
+| 環境問題 | 同一實作在不同 CI / 本地行為不一致 | 確認 toolchain 版本；檢查 time / timezone / locale 設定 |
+| Adapter / target service 問題 | 多實作對單一 domain 全紅 | 檢查 benchmark domain 的 target service 是否健康 |
+
+## 「規格問題還是實作問題」決策樹
+
+```text
+benchmark 紅
+├─ 多實作同時紅？
+│  ├─ 是 → 高機率規格問題（含 feature 模糊）
+│  │     → 讀全域 ADR + feature 確認規格寫得明
+│  │     → 若規格不明：Spec-First Correction
+│  │     → 若規格明：可能多實作恰好同時 bug，分別修
+│  └─ 否（單一實作紅）→ 該實作的 bug 或合理背離
+│        ├─ 規格明確 → bug，該語言 maintainer 修
+│        └─ 規格不適用該語言 → 寫專案 ADR 記錄背離
+```
+
+分類出類別後，該走哪個流程、由誰負責，以 [cross-impl-policy 的分流決策](/docs/contributing/implementer/cross-impl-policy) 為準——本頁只把問題診斷到「規格 vs 實作」這一步。分歧時不以 RI 行為作為判決基準（RI 在規格漏定義處也可能做了錯誤假設，全綠不代表符合規格）；詳見 [Reference Implementation](/docs/contributing/implementer)。
+
+## 上報規格歧義
+
+當確認是規格模糊而非實作錯誤，使用對應的 issue 模板提報：
+
+- 實作行為明確不同、規格措辭有歧義 → 使用 `spec_or_feature_proposal` 模板（對應 Spec-First Correction 流程）
+- 單一實作行為確定是 bug → 使用 `bug_report` 模板
+
+issue 填寫建議：
+
+- 標題：`[spec ambiguity] {scenario name}`
+- 必填：哪幾個實作不一致、各自的觀察行為、現行全域 ADR 與 feature 對該情境的描述（直接引用原文）
+- 建議的釐清方向（可選，但有助於加速討論）
+
+詳見 [reference/issue-templates](/docs/contributing/reference/issue-templates)。
+
+## 寫 reproduction 的最小化技巧
+
+- 只保留觸發問題的最小 scenario，刪除無關的 Given / When 步驟。
+- 用真實指令與符號（`api-call`、`entity-setup`、`entity-validate`、`time-control`；VAR `$`、CAS `&`、TIME `@`、capture `>` `<`）；見 [overview/glossary](/docs/contributing/overview/glossary)。
+- 提供完整可貼上的 `.feature` 片段，而非文字描述。
+- 標註環境：實作版本、toolchain 版本、OS / locale / timezone。

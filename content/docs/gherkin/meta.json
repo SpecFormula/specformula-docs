@@ -1,4 +1,6 @@
 {
-  "title": "Gherkin",
+  "title": "規格指南",
+  "description": "SpecFormula ISA 使用者文件",
+  "root": true,
   "pages": ["dsl", "isa"]
 }

@@ -1,0 +1,131 @@
+---
+title: Writing a Project ADR
+description: Operational rules from ADR-0017 — when to write a project ADR, how to name it, format requirements, and the review process.
+---
+
+A project ADR records implementation-level decisions for a specific language, complementing the language-neutral specification decisions in global ADRs. This page is the operational guide for ADR-0017 (`specs/adr/0017-hierarchical-adr-system.md`): when one is needed, how to write it, and what is prohibited.
+
+For the upstream process that governs when decisions escalate to the global layer, see [spec-author/decision-record](/docs/contributing/spec-author/decision-record).
+
+## When to write a project ADR
+
+Create a project ADR under `specformula-{lang}/specs/adr/` for any of the following:
+
+- Library or framework selection (e.g. Python choosing `httpx` vs `aiohttp`)
+- Toolchain choice (e.g. Python choosing `uv` vs `pip`)
+- Language-specific workarounds (GIL, AOT, native time type differences)
+- Performance optimization decisions (e.g. caching strategy, connection pooling)
+- A justified deviation from the global specification (must include a technical constraint rationale)
+
+## When not to write a project ADR
+
+- You have found a spec defect → follow the Spec-First Correction path via [spec-author/decision-record](/docs/contributing/spec-author/decision-record); do not silently reinterpret the spec in a project ADR.
+- You want to define a private standard that contradicts the global spec → this is explicitly prohibited.
+- You want to reference another language's project ADR → horizontal dependencies between project ADRs are prohibited (e.g. `python-0001` must not reference `java-0002`).
+
+## File name and location
+
+- Location: `specformula-{lang}/specs/adr/`
+- Naming format: `{prefix}-NNNN-kebab-case.md`
+
+Prefix reference:
+
+| Sub-package | Prefix |
+|---|---|
+| `specformula-python` | `python-` |
+| `specformula-java` | `java-` |
+| `specformula-csharp` | `csharp-` |
+| `specformula-ts` | `ts-` |
+| `specformula-lsp-plugin` | `lsp-plugin-` (prefix reserved; this sub-package is not currently in scope for development) |
+
+## Variance declaration header
+
+Every project ADR must include a variance declaration in the first section, after the title and before the Context. It states which global ADR this project ADR corresponds to or deviates from.
+
+When deviating from a global spec:
+
+```
+> **Reference baseline**: ADR-NNNN
+```
+
+When adding a local extension with no corresponding global spec:
+
+```
+> **Reference baseline**: None
+```
+
+## Example A: deviation from a global spec
+
+```markdown
+# python-0001: time-control internals carry datetime.datetime
+
+> **Reference baseline**: ADR-0005
+
+# Context
+
+ADR-0005 defines the concept of DateTimeTZ (a time-zone-aware datetime) as the output of time-control. Python's standard library `datetime.datetime` with tzinfo satisfies this concept without pulling in `arrow` or `pendulum`.
+
+# Solution
+
+Internally carry DateTimeTZ as `datetime.datetime` + `zoneinfo.ZoneInfo`. The external API serializes to ISO 8601 with timezone offset, conforming to the global spec.
+
+# Resulting Context
+- Pros: zero external dependency
+- Cons: Python 3.8 and below are unsupported (already past EOL; no practical impact)
+```
+
+Note: ADR-0005 (`0005-time-system-outputs-java-time-types.md`) is a legacy ADR that is coupled to Java implementation details — the kind of coupling that ADR-0017 was designed to fix. A project ADR that deviates from ADR-0005 should acknowledge this context in the Context section.
+
+## Example B: local extension (reference baseline None)
+
+```markdown
+# python-0002: use uv as the package manager
+
+> **Reference baseline**: None
+
+# Context
+
+The choice of Python package manager is unrelated to the global spec; it is a language-ecosystem decision. `uv` is approximately 10x faster than `pip` / `poetry` and has been widely adopted by the community.
+
+# Solution
+
+Use `uv` to manage dependencies and virtual environments. `pyproject.toml` remains `pip`-installable as a fallback.
+
+# Resulting Context
+- Pros: installation speed, lockfile reproducibility
+- Cons: relatively new; requires monitoring for breaking changes in uv itself
+```
+
+## Content section requirements
+
+Follow the global ADR structure from `specs/adr/0000-adr-template.md`:
+
+- Context
+- Problem
+- Forces
+- Solution
+- Resulting Context (Pros / Cons)
+- Alternatives
+
+Deviation-type ADRs have four additional requirements:
+
+1. **Deviation rationale**: a specific technical constraint. "I prefer it" is not sufficient.
+2. **Workaround description**: how the behavior expected by the global spec is achieved through the language's alternative approach.
+3. **Limitations**: situations where this workaround does not apply.
+4. **Migration path**: whether it would be possible to return to the standard path if the spec or language ecosystem changes.
+
+## Review process
+
+- **PR is the review**: open a PR and have it reviewed by the language maintainer. Global maintainer approval is not required unless the reviewer determines the scope should be elevated to the global layer.
+- **Review checklist**:
+  - Does the deviation have a technical rationale? (Minor library preference differences with no significant impact may not warrant a project ADR at all.)
+  - Does the variance declaration correctly reference the global ADR?
+  - No horizontal dependencies (no references to another language's project ADR)
+
+## Prohibited actions
+
+1. **Do not reference another language's project ADR** (no horizontal dependencies)
+2. **Do not define a private standard that contradicts the global spec** (spec defects go through Spec-First Correction)
+3. **Do not embed implementation details in a global ADR** (Strict Deviation Principle)
+
+Any of the above will cause the PR review to request changes before it can be merged.

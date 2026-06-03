@@ -1,0 +1,71 @@
+---
+title: 新增文件頁面
+description: 在 specformula-docs 新增頁面的 section 選擇、路由慣例、i18n 對應與 sidebar 設定方式。
+---
+
+本頁說明如何判斷新頁面放在哪個 section、建立檔案的命名慣例、中英 i18n 對應，以及如何加入 sidebar。
+
+## 決定放在哪個 section
+
+目前 `specformula-docs/content/docs/` 下存在的 section：
+
+| Section | 路由前綴 | 說明 |
+|---|---|---|
+| `gherkin/` | `/docs/gherkin/...` | ISA 規格文件（指令、符號、型別等） |
+| `contributing/` | `/docs/contributing/...` | 本貢獻者指南 |
+
+若未來新增 section，可能包含 reference、tutorial、concepts、changelog 等，但這些目前不存在，不要在現有頁面加入指向它們的連結。不確定該放哪 → 先開 Discussion，避免建立未規劃的 section。
+
+## 建立頁面
+
+新增頁面的路徑格式：
+
+```
+specformula-docs/content/docs/{section}/{kebab-case-page}.mdx
+```
+
+每頁必備 frontmatter：
+
+```yaml
+---
+title: 頁面標題
+description: 一句話描述，會用在 OG card 與搜尋摘要。
+---
+```
+
+## 中英 i18n 對應
+
+此 repo 的 i18n 慣例：zh-TW 為預設語言，每個 section 下的檔案成對存在。
+
+| 語言 | 檔名 | 範例 |
+|---|---|---|
+| zh-TW（預設） | `{page}.mdx` | `adding-pages.mdx` |
+| English | `{page}.en.mdx` | `adding-pages.en.mdx` |
+
+Sidebar 與路由 metadata 由每個目錄下的 `meta.json`（zh-TW）與 `meta.en.json`（英文）控制，兩者各自維護 `pages` 陣列。新增頁面後，需在對應目錄的 `meta.json` 與 `meta.en.json` 的 `pages` 陣列中加入新頁面的名稱（不含副檔名）。
+
+不使用 `content/zh-TW/...` 目錄樹結構。
+
+## 與既有頁面的交叉連結
+
+站內連結用 Fumadocs 路由路徑（絕對路徑，無副檔名），例如：
+
+```
+[glossary](/docs/contributing/overview/glossary)
+[TIME 系統](/docs/gherkin/isa/backend/symbols/time)
+```
+
+不使用 relative path（`../`）跨 section 連結，避免 i18n locale prefix 下路徑解析不一致。
+
+不要連到 glossary 的 anchor（`#term`），直接連頁面路徑 `/docs/contributing/overview/glossary`。
+
+連到 parent repo 中的檔案（ADR、spec、script）時，改用 inline code 而非超連結，例如：
+`specs/adr/0017-hierarchical-adr-system.md`、`scripts/sync-global-features.sh`。不使用 GitHub URL（發版後 branch URL 會失效）。
+
+## Sidebar 與索引確認
+
+頁面 merge 後確認以下三項：
+
+- Sidebar 顯示正確（由 `meta.json` / `meta.en.json` 的 `pages` 陣列控制，需手動維護）。
+- 站內搜尋找得到該頁面。
+- 上下頁導覽串得起來。

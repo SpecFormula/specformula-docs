@@ -1,0 +1,118 @@
+---
+title: Issue Templates
+description: Usage context and required fields for the five issue templates in specformula-dev-framework.
+---
+
+`.github/ISSUE_TEMPLATE/` contains five templates (plus `config.yml`). Choose the right one before opening an issue; using the wrong template slows down triage.
+
+## bug_report
+
+**File**: `.github/ISSUE_TEMPLATE/bug_report.yml`
+
+**When to use**: A situation where the spec clearly defines the expected behavior and an implementation deviates from it, or where documentation contradicts actual behavior.
+
+**Required fields**:
+
+- **Summary**: What happened? What should have happened instead?
+- **Affected area**: Select from the dropdown (multi-select): Global specs / ADRs, Java RI, C#, Python, TypeScript, Benchmark / fixtures, Documentation, CI / release, Unsure.
+- **Reproduction steps**: A complete, pasteable `.feature` snippet or minimal reproduction steps — someone else must be able to paste it into a clean environment and get the same failure.
+- **Pre-submit checks**: Confirm this is not a security vulnerability; confirm sufficient reproduction context is included.
+
+**Optional but strongly recommended**:
+
+- **Contract source or expected behavior basis**: The relevant ADR, feature file (e.g. `specs/features/isa/instruction/api-call/api-call.feature`), vocab, or terminology mapping.
+- **Environment**: Toolchain versions, OS, locale, timezone (required for time-related cases).
+- **Error output / logs**: Remove credentials and tokens before pasting.
+
+### Triage for cross-implementation inconsistencies
+
+When multiple implementations behave differently, determine which category applies before choosing a template:
+
+| What you observed | Where to go |
+|---|---|
+| Spec is clear; one implementation deviates | **bug_report**, label `lang:{Lang}` (e.g. `lang:Python`) |
+| Spec is ambiguous; multiple implementations interpret it differently | **spec_or_feature_proposal** (global ADR) |
+| Spec is clear; the difference is a justified language deviation (technical constraint) | [Project ADR PR](/docs/contributing/implementer/writing-project-adr) in that sub-package |
+| You are not sure which category applies | Use bug_report, select Unsure under Affected area; a maintainer will triage |
+
+---
+
+## spec_or_feature_proposal
+
+**File**: `.github/ISSUE_TEMPLATE/spec_or_feature_proposal.yml`
+
+**When to use**: Proposing a new or modified global spec — instruction, symbol, semantics, behavior, public API, or plugin capability. This template covers what was previously two separate templates ("Spec Proposal" and "New Command Request"); in practice both converge here and lead to this template plus an ADR draft PR.
+
+**Required fields**:
+
+- **Problem / motivation**: What user or contributor problem does this proposal solve?
+- **Proposal type**: Select from the dropdown (multi-select): New instruction, New symbol, New constraint / assertion behavior, New DSL behavior, New public API, New plugin / adapter capability, Cross-language behavior change, Benchmark / fixture scenario, Documentation-visible behavior, Unsure.
+- **Proposed contract**: Describe the expected behavior as a contract; Given/When/Then examples are welcome. Include required fields, error behavior, and compatibility notes.
+- **Validation plan**: How should this be validated? Mention Java RI, affected languages, benchmark, docs.
+
+**Optional**:
+
+- **Contract assets likely affected**: Which ADRs, feature files, vocab, terminology mappings, or benchmark paths will be affected.
+- **Compatibility / migration impact**: Whether this is breaking; whether a migration note is needed.
+- **Follow-up scope**: Known work intentionally excluded from the first PR.
+
+**When to open a Discussion first**: If the direction is still unclear, you want to gauge community interest, or you expect significant controversy — open a Discussion to reach consensus, then file this issue and an ADR draft PR.
+
+---
+
+## architecture_refactor
+
+**File**: `.github/ISSUE_TEMPLATE/architecture_refactor.yml`
+
+**When to use**: Proposing architecture or refactor work that **should not change public behavior**. If the change touches instructions, symbols, constraints, public APIs, or cross-language contracts, use spec_or_feature_proposal instead.
+
+**Required fields**:
+
+- **Context**: Which component, package, or layer needs refactoring and what role it plays.
+- **Problem**: The maintainability, architecture, testability, performance, or release problem that exists today.
+- **Proposed direction**: Design direction and major boundaries.
+- **Behavior boundary**: Why this should not change public behavior; if any behavior may change, identify the contract source explicitly.
+- **Affected area**: Multi-select dropdown (same options as bug_report plus Repository governance / contributor docs).
+- **Verification plan**: Which tests, benchmarks, docs checks, or release checks will prove behavior is preserved.
+
+**Optional**:
+
+- **Migration / rollout plan**: Whether the change can be split safely; what reviewers should look at first.
+
+---
+
+## ci_release_issue
+
+**File**: `.github/ISSUE_TEMPLATE/ci_release_issue.yml`
+
+**When to use**: CI, package publishing, release gates, signing, artifact handling, or workflow permissions. Do not include security vulnerability details, secrets, or tokens in a public issue.
+
+**Required fields**:
+
+- **Affected area**: Multi-select dropdown (Java release / Maven Central, C# release / NuGet, TypeScript CI / package publishing, Python CI / package publishing, Test workflow, Benchmark workflow, Artifact signing / provenance, Workflow permissions / secrets, Repository metadata, Other).
+- **Summary**: What is failing or what change is proposed.
+- **Security / release impact**: Permissions, secrets, approval gates, tags, artifacts, package publishing, or rollback concerns.
+
+**Optional**:
+
+- **Evidence / logs**: Link to workflow runs or paste sanitized logs.
+- **Proposed fix or next step**.
+
+---
+
+## docs_issue
+
+**File**: `.github/ISSUE_TEMPLATE/docs_issue.yml`
+
+**When to use**: Documentation that is unclear, outdated, missing, or conflicting. If the requested change would effectively define new behavior, use spec_or_feature_proposal instead.
+
+**Required fields**:
+
+- **Documentation location**: Link or name the file, section, page, or missing page.
+- **What is unclear, missing, outdated, or conflicting**: Describe the specific problem.
+- **Documentation type**: Multi-select dropdown (README / quickstart, Global specs / ADRs, Feature / vocab / terminology docs, Language implementation docs, Benchmark docs, Contributor / governance docs, Release / CI docs, Translation, Broken link / typo).
+
+**Optional**:
+
+- **Source of truth / evidence**: The ADR, feature file, vocab, terminology mapping, or PR that the docs should align with.
+- **Suggested fix**: Proposed wording, structure, or link target.

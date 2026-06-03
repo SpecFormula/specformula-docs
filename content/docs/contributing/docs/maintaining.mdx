@@ -1,0 +1,78 @@
+---
+title: 文件種類與維護
+description: 區分 Docs 站與專案內 README 兩種文件、各自的功能與維護方式，以及 Docs 站的本機啟動。
+---
+
+這個專案有**兩種文件**，功能與維護方式都不同，不要混在一起：
+
+| | Docs 站 | 專案內文件（in-repo） |
+|---|---|---|
+| 是什麼 | 策展、可搜尋的發佈網站 | 跟程式碼放一起的 markdown |
+| 在哪 | `specformula-docs` submodule | 各 repo / 套件根目錄 |
+| 渲染 | Fumadocs build（需本機啟動才看得到） | GitHub 直接 render，無 build |
+| 維護 | 改 MDX、走 submodule PR、套 style-guide / i18n / 元件慣例 | 跟程式碼**同一個 PR**改、一起版控、照該 repo 自己的慣例 |
+| 例子 | ISA 語法頁、本貢獻指南 | 套件 build/test 說明、根目錄治理檔、ADR |
+
+---
+
+## Docs 站（specformula-docs）
+
+你正在讀的這個站。`specformula-docs` 是 parent monorepo 的 **git submodule**——獨立 repo、獨立 commit history。
+
+### 本機啟動
+
+```bash
+# 1. 取得 submodule 內容（clone parent 時沒加 --recursive 的話）
+git submodule update --init specformula-docs
+
+# 2. 進 submodule、裝依賴、起 dev server
+cd specformula-docs
+pnpm install        # postinstall 會跑 fumadocs-mdx 產生 .source
+pnpm dev            # 開 http://localhost:3000
+```
+
+需求：Node 22（`.nvmrc`）、pnpm 10.28。其他指令：
+
+```bash
+pnpm build          # next build；送 PR 前確認可建置
+pnpm types:check    # fumadocs-mdx + next typegen + tsc --noEmit
+pnpm lint           # eslint
+```
+
+### submodule 維護流程
+
+- **改動**：submodule 預設停在 detached HEAD，直接 commit 會落在游離 commit。改之前先在 submodule 內開分支，再 commit、push 到 `specformula-docs` repo。
+- **回連 parent**：submodule 有新 commit 後，在 parent 提交更新後的 submodule pointer，文件版本才跟著 parent 走。
+- 不要在 parent 改了 submodule 內容卻沒在 submodule repo 提交——pointer 會指向不存在的 commit。
+
+### 技術棧與目錄
+
+[Fumadocs](https://fumadocs.dev)（`fumadocs-core` / `fumadocs-mdx` / `fumadocs-ui`）+ Next.js 16（Turbopack）。
+
+```
+specformula-docs/
+├── content/docs/         # MDX 內容
+│   ├── gherkin/          # 使用者文件（ISA 語法）
+│   └── contributing/     # 本貢獻指南
+├── src/
+│   ├── app/              # Next.js App Router
+│   ├── components/       # 自訂元件：mermaid、hash-tabs、language-toggle…
+│   ├── mdx-components.tsx # 註冊給 MDX 用的全域元件
+│   └── middleware.ts     # i18n locale 處理
+├── source.config.ts      # fumadocs-mdx 來源設定
+└── next.config.mjs
+```
+
+寫作慣例見 [文件風格指南](/docs/contributing/docs/style-guide)、[翻譯指南](/docs/contributing/docs/translation)、[新增文件頁面](/docs/contributing/docs/adding-pages)——這三頁只適用 Docs 站。
+
+---
+
+## 專案內文件（in-repo）
+
+跟程式碼放一起的 markdown，由 GitHub 直接渲染、跟程式碼一起版控。**改動跟著程式碼走在同一個 PR**，不搬到 Docs 站、也不在 Docs 站重複。
+
+- **根目錄治理**：`README.md`、`CONTRIBUTING.md`（+ `.zh-TW`）、`CODE_OF_CONDUCT`、`SECURITY`、`SUPPORT`、`QUICKSTART.md`、`GIT_MESSAGE_GUIDELINES.md`、`PR.md`、`LICENSE.md`。
+- **各語言套件**：`specformula-{java,python,csharp,ts}/README.md`（該套件的 build / test / 架構說明）；`specformula-python/` 另有 `CONTRIBUTING.md` 與 `ACCEPTANCE.md`（merge gate）。
+- **規格 / benchmark**：`specs/README.md`、`benchmark/<domain>/README.md`、ADR（`specs/adr/*.md` 與各語言專案 ADR）。
+
+維護原則：改某套件的行為就順手更新該套件的 README；治理檔（CONTRIBUTING / CoC / SECURITY / SUPPORT）在 root 維護。根目錄 `CONTRIBUTING.md` 是 GitHub 上的精簡版，詳細版就是 Docs 站的這份貢獻指南；兩者分開，不要把詳細內容塞回 root。Docs 站要指到這些檔時用 inline code 寫路徑（如 `specs/adr/0017-...md`），不用 GitHub URL。

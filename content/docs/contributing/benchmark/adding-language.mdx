@@ -1,0 +1,92 @@
+---
+title: 新增語言 target（Adapter）
+description: 透過 Java-For-All Adapter 把既有 benchmark domain 擴展到新語言實作的流程。
+---
+
+[新增 domain](/docs/contributing/benchmark/adding-domain) 是加一個新業務情境；本頁是另一個方向：把**既有** domain 擴展到**新語言**的 target service。這條路走 Java-For-All Adapter，設計與理由見 `specs/adr/0023-java-for-all-benchmark-adapter.md`。
+
+新語言貢獻者只需要實作業務邏輯、Test Control API 與 Dockerfile，不需要自建測試框架，就能用 Java 端的同一份 Spec 完成驗收。
+
+## Adapter 是什麼
+
+每個 domain 的 `adapter/` 是一個 Spring Boot 子專案，與該 domain 的 `specs/`（`.isa.feature`、`api-spec.yml`、Entity DDL）共用同一份語言中立規格。
+
+- 測試端（`adapter/src/test`）用 Cucumber + SpecFormula + MockMvc，與一般 Java benchmark 配置一致。
+- 實作端（`adapter/src/main`）是一個 catch-all `ProxyController`（`@RequestMapping("/**")`），把收到的請求原封不動 HTTP 轉發到被測服務。新增 API 時 adapter 不需要修改，SpecFormula 框架也不需要任何改動。
+- DB 由 Java 端的 Testcontainers 統一啟動（PostgreSQL / MySQL），被測服務透過環境變數連入同一組 DB。
+
+因為 `entity-setup` / `entity-validate` 由 Java 端直連 DB（JDBC）執行，`api-call` / `response-validate` 經 adapter 轉發到被測服務，所有語言因此通過完全相同的 Spec 驗收，沒有測試框架差異造成的標準落差。
+
+## 一個 scenario 怎麼跑
+
+```text
+Given  準備資料        ->  Java JDBC INSERT 進 DB
+When   呼叫 API        ->  Java HTTP 請求 -> adapter -> 被測服務
+Then   驗證 response   ->  Java 斷言 HTTP 狀態 + body
+Then   驗證 DB 狀態    ->  Java JDBC SELECT 查 DB
+```
+
+被測服務在 When 階段讀寫的是同一個 DB，所以 Then 階段 Java 端可以直接驗證 DB 狀態。
+
+## 目錄結構
+
+```text
+benchmark/<domain>/
+├── specs/            # 所有語言共用：features/*.isa.feature、api/api-spec.yml、data/*/DDL
+├── java/             # Java 原生 benchmark（MockMvc 模式，保持不變）
+├── adapter/          # Java-For-All adapter（Spring Boot：ProxyController + stepdefs + run.sh）
+├── python/           # 各語言 target：業務程式 + Dockerfile + build.sh
+├── typescript/
+├── csharp/
+└── ...               # go、rust 等視 domain 而定
+```
+
+## 新語言接入流程
+
+依該 domain 的 `adapter/run.sh` 與 `specs/adr/0023-java-for-all-benchmark-adapter.md`，步驟為：
+
+1. 在 `benchmark/<domain>/<language>/` 建立專案。
+2. 讀 `specs/api/api-spec.yml`，實作所有業務 API endpoint。
+3. 讀 `specs/data/.../*.sql`，連接同一組 DB（ORM 或 raw SQL 皆可）。
+4. 實作 Test Control API（見下節）。
+5. 寫 `Dockerfile`（接收 DB 連線環境變數）與 `build.sh`（只負責 build image，不跑測試）。
+6. 跑 adapter 測試，用 BDD 紅綠燈循環直到全部 scenario 通過。
+
+## Test Control API 契約
+
+被測服務是獨立 process，in-process 的 mock time 與 JWT 覆蓋機制不適用，因此被測服務必須額外提供測試專用 endpoint（production build 可不包含）：
+
+| 契約 | 說明 |
+|---|---|
+| health check | 回傳 200，供 harness 等待服務就緒 |
+| `POST /test/token`（`{"userId": ...}` → `{"token": "..."}`） | 被測服務用自己的 secret 與 JWT library 簽 token；harness 只把它放進後續請求的 `Authorization: Bearer` |
+| `POST /test/time`（`{"now": "ISO8601"}`） | 設定 mock time；業務邏輯取得當前時間必須經過可覆蓋的 TimeService 抽象 |
+| `DELETE /test/time` | 還原為系統時間 |
+| DB 連線環境變數 | 被測服務從環境變數讀取 DB 連線，連入 harness 啟動的同一組 DB |
+
+`time-control` 指令在 adapter 模式下，會在設定 harness context 的同時發 `POST /test/time` 到被測服務同步時間。
+
+<Callout type="warn">
+確切的 endpoint 路徑與環境變數名稱依各 domain 的 `adapter/run.sh` 與 `application.yml` 為準。例如 `ecommerce_platform` 的 health check 走 `/test/health`，DB 連線用 `DB_POSTGRESQL_URL` / `DB_POSTGRESQL_USERNAME` / `DB_POSTGRESQL_PASSWORD`。動手前先讀該 domain 的 `run.sh`。
+</Callout>
+
+## 執行
+
+每個 domain 的 `adapter/` 目錄有標準化的 `run.sh`。前置條件：Docker 正在運行、Maven 已安裝。
+
+```bash
+cd benchmark/ecommerce_platform/adapter
+
+./run.sh --build python          # 先 build python target image，再跑測試
+./run.sh my-go-service:latest    # 直接用已存在的 image 跑
+./run.sh --expected-failure      # 只跑標記 @expected-failure 的 scenario
+```
+
+紅綠燈循環：讀失敗的 scenario，找出缺的 API 或不符的行為，在 `<language>/` 實作或修正，重跑 `run.sh` 直到全綠。
+
+## 與其他頁的關係
+
+- 這是「把既有 domain 擴展到新語言」；若要新增一個全新業務情境，走 [新增 domain](/docs/contributing/benchmark/adding-domain)。
+- 在整體貢獻流程中的位置見 [貢獻流程 SOP](/docs/contributing/lifecycle) 第 6 階段（擴展至其他語言）。
+- 本機執行與跨實作 diff 解讀見 [本機執行](/docs/contributing/benchmark/running-locally)。
+- 設計決策與架構全文見 `specs/adr/0023-java-for-all-benchmark-adapter.md`。

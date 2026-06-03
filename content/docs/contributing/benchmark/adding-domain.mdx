@@ -1,0 +1,53 @@
+---
+title: 新增 Domain
+description: 何時需要新增 benchmark domain、domain 的必要結構、審核條件，以及各語言實作需要對應的改動。
+---
+
+新增 domain 是對 benchmark 套組影響較大的操作。新 domain 會新增跨實作的 conformance case，且需要長期維護。本頁說明何時適合提案、該包含哪些內容，以及如何通過審核。
+
+## 什麼條件下需要新 domain
+
+新 domain 適合以下情況：
+
+- 既有 domain 無法覆蓋的業務情境類型（例如目前沒有「金融交易」或「即時通訊」類型）
+- 需要驗證的指令組合與既有 domain 顯著不同
+- 預期會被使用者拿來當參考的代表性領域
+
+以下情況不應開新 domain：
+
+- 只想多補一個 case：補到既有 domain 即可
+- 想測極端 edge case：用 `specs/features/isa/instruction/{command}/` 下的 ISA instruction feature，不需要開 domain
+
+## Domain 解剖
+
+新 domain 走 adapter conformance 模式（同 `ecommerce_platform` / `todo_list`）。必要結構：
+
+```
+benchmark/{domain}/
+├── specs/              # 共用語言中立規格：features/{isa,dsl}、api/、data/、isa.yml、sync.sh
+├── adapter/            # Java-For-All adapter（Spring Boot：ProxyController + run.sh）
+├── java/               # Java 原生 benchmark（MockMvc）
+├── python/  typescript/  csharp/   # 各語言 target service
+└── README.md           # 業務情境說明
+```
+
+`specs/features/` 下的 scenario 使用標準 specformula-dev-framework 指令與符號。實際案例請見 [conformance-cases](/docs/contributing/benchmark/conformance-cases)。
+
+## 加新 domain 的審核條件
+
+提案必須滿足以下所有條件：
+
+- **業務情境合理**：該 domain 對應到真實開發場景，而非為了測試 specformula-dev-framework 內部機制而硬編。
+- **維護承諾**：新 domain 增加了跨實作的 case 數，提案者須承諾長期維護或指定繼任的 maintainer。
+- **不重疊**：與既有 domain 的測試目的有明確區隔。
+- **語言中立**：`specs/` 的 API 規範語言中立，各語言 target 可分開提交。
+
+## 各語言實作要做的對應改動
+
+新增 domain 後，各語言實作需要：
+
+- 跑通該 domain 的 conformance case
+- 若需要新的 adapter 行為，補對應的支援（通常是 HTTP client 設定）
+- 必要時為該 domain 寫專案層 ADR，例如某語言的 HTTP client 對該 domain 有特殊需求
+
+新語言目標若需要接入 benchmark，走 Java-For-All adapter 流程，見 [新增語言 target（Adapter）](/docs/contributing/benchmark/adding-language)。

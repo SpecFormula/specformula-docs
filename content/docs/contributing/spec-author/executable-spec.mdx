@@ -1,0 +1,65 @@
+---
+title: 可執行規格（feature）
+description: specs/features 的目錄結構、feature 檔與 vocab.md 寫法，以及語言中立慣例。
+---
+
+可執行規格定義可觀察行為，放在 `specs/features/`。這些是**框架本身的語法測試規格**（不是使用者業務測試）。一份貢獻通常包含：feature 檔、同目錄的 `vocab.md`，以及必要時的 terminology。
+
+## 目錄結構
+
+- `specs/features/isa/` — ISA 層：
+  - `instruction/<cmd>/` — 指令（`api-call`、`entity-setup`、`entity-validate`、`entity-non-existence-validate`、`response-validate`、`time-control`）。body 形式分 `data-table/` 與 `json/`。
+  - `symbol-system/` — 符號系統：`VAR.feature`、`CAS.feature`、`Time.feature`。
+  - `spec-reader/` — SpecReader：`api`、`entity`、`isa-config`。
+- `specs/features/dsl/` — DSL 層：step 展開、table 展開、yml reader、data format 等。
+- `terminology-dictionary.yml` + `terminology-mapping-<lang>.yml`。
+
+## feature 檔
+
+`Feature:` 標題加一句說明，底下是數個 `Scenario:`，每個 scenario 就是一個具體 example。Step 用中文，含指令名（kebab-case）與真實符號（`$` `&` `@` `>` `<`）：
+
+```gherkin
+Feature: TimeControl - 設定測試情境時間
+
+  Scenario: @time(now-1d) 基於已設定時間
+    Given time-control 設定時間為 "2025-11-04T08:00:00"
+    When time-control 設定時間為 "@time(now-1d)"
+    Then time-control 現在時間的年月日為 2025-11-03
+
+  Scenario: 空字串應拋出例外
+    When time-control 設定時間為 ""
+    Then time-control 應拋出 SpecFormulaArgumentError
+    And 錯誤碼為 "EXEC_TIME_PARAM_MISSING"
+```
+
+- **變種**：同一指令的 golden / edge / error，以及 `data-table` vs `json`、`-var` / `-time`，各自獨立 `.feature`。
+- 用相對時間 `@time(now-1d)`，不寫死絕對日期，避免測試隨日期失效。
+- Scenario 名稱用動賓結構，不寫實作術語、不暗示語言細節。
+
+## vocab.md
+
+每個 feature 目錄附 `vocab.md`，列出所有句型；各語言依此實作 stepdef：
+
+| 句型 (Step Pattern) | 定義 (Definition) | 測試意圖 (Test Intent) |
+
+- 依 **Given / When / Then** 分組。
+- 句型用 `{placeholder}`（如 `"{time_expr}"`、`{date}`）。
+- 新增句型 → 各語言新增 stepdef；改既有句型語義 → 重構既有 stepdef；沿用既有句型 → 不動 stepdef。
+
+## 符號與指令都在這層定義
+
+- **符號**（VAR `$` / CAS `&` / TIME `@` / 擷取 `>` `<`）：在 `symbol-system/` 補 feature；語義與語法（EBNF grammar）的決策寫進 ADR。
+- **指令**（kebab-case）：在 `instruction/<cmd>/` 補 feature + `vocab.md`；引數、副作用、錯誤合約的決策寫進 ADR。
+
+## 錯誤斷言
+
+錯誤句型 `Then ... 應拋出 SpecFormula*Error` 與 `And 錯誤碼為 "..."` 的權威定義在 `specs/adr/0026-specformula-error-taxonomy.md`，`vocab.md` 不重述（避免雙寫漂移）。
+
+## 語言中立
+
+- Step 與術語語言中立：用 `DateTimeTZ`、`SpecFormulaArgumentError` 等中立詞，各語言再以 `terminology-mapping-<lang>.yml` 對映回原生型別 / 例外。
+- 不寫語言特定 library 或型別（那屬於專案 ADR 與各語言實作）。
+
+## 好範例
+
+`specs/features/isa/instruction/time-control/time-control.feature` 與其 `vocab.md`：scenario 名稱動詞清楚、句型來自 `vocab.md`、用相對時間、錯誤碼對應 terminology。

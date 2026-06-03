@@ -1,0 +1,65 @@
+---
+title: Executable Spec (feature)
+description: The specs/features layout, how to write feature files and vocab.md, and language-neutrality conventions.
+---
+
+Executable specs define observable behavior and live in `specs/features/`. These are the **framework's own syntax-test specs** (not user business tests). A contribution usually includes a feature file, a `vocab.md` in the same directory, and terminology when needed.
+
+## Layout
+
+- `specs/features/isa/` — the ISA layer:
+  - `instruction/<cmd>/` — instructions (`api-call`, `entity-setup`, `entity-validate`, `entity-non-existence-validate`, `response-validate`, `time-control`). Body forms split into `data-table/` and `json/`.
+  - `symbol-system/` — symbol systems: `VAR.feature`, `CAS.feature`, `Time.feature`.
+  - `spec-reader/` — SpecReader: `api`, `entity`, `isa-config`.
+- `specs/features/dsl/` — the DSL layer: step expansion, table expansion, the yml reader, data formats, etc.
+- `terminology-dictionary.yml` + `terminology-mapping-<lang>.yml`.
+
+## Feature files
+
+A `Feature:` heading with one line of description, then several `Scenario:` blocks — each scenario is a concrete example. Steps are written in Chinese and include the instruction name (kebab-case) and real symbols (`$` `&` `@` `>` `<`):
+
+```gherkin
+Feature: TimeControl - 設定測試情境時間
+
+  Scenario: @time(now-1d) 基於已設定時間
+    Given time-control 設定時間為 "2025-11-04T08:00:00"
+    When time-control 設定時間為 "@time(now-1d)"
+    Then time-control 現在時間的年月日為 2025-11-03
+
+  Scenario: 空字串應拋出例外
+    When time-control 設定時間為 ""
+    Then time-control 應拋出 SpecFormulaArgumentError
+    And 錯誤碼為 "EXEC_TIME_PARAM_MISSING"
+```
+
+- **Variants**: golden / edge / error of the same instruction, plus `data-table` vs `json` and `-var` / `-time`, each in its own `.feature`.
+- Use relative time `@time(now-1d)`, never a hard-coded absolute date, so tests do not break over time.
+- Scenario names use a verb-object phrase; no implementation terms, no language hints.
+
+## vocab.md
+
+Each feature directory has a `vocab.md` listing every step pattern; each language implements stepdefs from it:
+
+| Step Pattern | Definition | Test Intent |
+
+- Grouped by **Given / When / Then**.
+- Patterns use `{placeholder}` (e.g. `"{time_expr}"`, `{date}`).
+- A new pattern → each language adds a stepdef; changed semantics of an existing step → refactor the stepdef; reusing an existing step → no stepdef change.
+
+## Symbols and instructions are defined at this layer
+
+- **Symbols** (VAR `$` / CAS `&` / TIME `@` / capture `>` `<`): add a feature under `symbol-system/`; the semantics and syntax (EBNF grammar) decision goes into an ADR.
+- **Instructions** (kebab-case): add a feature + `vocab.md` under `instruction/<cmd>/`; the arguments, side effects, and error-contract decision goes into an ADR.
+
+## Error assertions
+
+The error patterns `Then ... 應拋出 SpecFormula*Error` and `And 錯誤碼為 "..."` are authoritatively defined in `specs/adr/0026-specformula-error-taxonomy.md`; `vocab.md` does not restate them (to avoid double-write drift).
+
+## Language neutrality
+
+- Steps and terms are language-neutral: use neutral terms like `DateTimeTZ` and `SpecFormulaArgumentError`; each language maps them to native types / exceptions via `terminology-mapping-<lang>.yml`.
+- Do not write language-specific libraries or types (those belong in project ADRs and the implementations).
+
+## A good example
+
+`specs/features/isa/instruction/time-control/time-control.feature` and its `vocab.md`: clear verb-based scenario names, patterns sourced from `vocab.md`, relative time, and error codes that match the terminology.

@@ -1,0 +1,46 @@
+---
+title: Benchmark Overview
+description: The role of benchmark/ as a cross-implementation conformance gate, the three kinds of domain, and the directory layout.
+---
+
+`benchmark/` verifies that the language implementations behave consistently, using real business scenarios. It is not a unit test: unit tests protect a single implementation's internals; benchmarks verify conformance across languages.
+
+## Benchmark vs. unit test
+
+| | unit test | benchmark |
+|---|---|---|
+| Scope | internal modules of one implementation | across multiple language implementations |
+| Purpose | regression protection for that language | conformance / spec verification |
+| Meaning of a failure | a bug in that implementation | a spec defect, an implementation deviation, or a real bug (triage via [cross-impl-policy](/docs/contributing/implementer/cross-impl-policy)) |
+
+## Three kinds of domain
+
+The directories under `benchmark/` are not all the same thing:
+
+| domain | kind | contents |
+|---|---|---|
+| `ecommerce_platform`, `todo_list` | **Adapter conformance** | `specs/` (shared spec) + `adapter/` (Java-For-All harness) + per-language targets; DB-backed, many variants (rust, `java_multi_ds`, audit-plugin) |
+| `guessing_game` | **Native per-language** | each language directory carries its own spec and tests; no `adapter/`, no shared `specs/` |
+| `agent_hr_system` | **Demo app (not conformance)** | a full HR system (Spring Boot + Next.js + docker-compose) showcasing the SDD workflow — not a cross-implementation conformance gate |
+
+To add a business scenario see [adding a domain](/docs/contributing/benchmark/adding-domain); to extend an existing domain to a new language see [adding a language target](/docs/contributing/benchmark/adding-language).
+
+## Directory layout
+
+An adapter-conformance domain (`ecommerce_platform` as the example):
+
+```
+benchmark/ecommerce_platform/
+├── specs/              # shared language-neutral spec: features/{isa,dsl}, api/, data/, isa.yml, sync.sh
+├── adapter/            # Java-For-All adapter (Spring Boot: ProxyController + run.sh)
+├── java/               # Java native benchmark (MockMvc)
+├── python/  typescript/  csharp/  rust/   # per-language target services
+├── audit-plugin/  ...   # audit-plugin variants (incl. csharp- / python- variants)
+└── README.md
+```
+
+A native per-language domain (`guessing_game`) has each language directory carrying its own `pom.xml` / spec, with no `adapter/` and no shared `specs/`.
+
+## How to run
+
+Per-language acceptance commands are in [Implementer shared steps](/docs/contributing/implementer); the adapter `run.sh` and the full local flow are in [running locally](/docs/contributing/benchmark/running-locally).

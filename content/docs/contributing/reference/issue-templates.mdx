@@ -1,0 +1,118 @@
+---
+title: Issue 模板
+description: specformula-dev-framework 五種 issue 模板的使用情境與必填欄位說明。
+---
+
+`.github/ISSUE_TEMPLATE/` 中有五種模板（加上 `config.yml`）。開 issue 前先確認用哪一種；錯用模板會拖慢 triage 速度。
+
+## bug_report
+
+**檔案**：`.github/ISSUE_TEMPLATE/bug_report.yml`
+
+**何時用**：你能描述清楚的「規格已有定義、實作行為不符」情境，或發現文件與行為不一致。
+
+**必填欄位**：
+
+- **Summary**：發生了什麼？預期行為是什麼？
+- **Affected area**：從下拉選單選出涉及的實作（可複選）：Global specs / ADRs、Java RI、C#、Python、TypeScript、Benchmark / fixtures、Documentation、CI / release、Unsure。
+- **Reproduction steps**：完整可貼上的 `.feature` 片段或最小重現步驟，別人能複製貼上在乾淨環境跑出同樣失敗。
+- **Pre-submit checks**：確認這不是 security vulnerability；確認提供足夠重現資訊。
+
+**選填但強烈建議**：
+
+- **Contract source or expected behavior basis**：對應的 ADR、feature 檔（如 `specs/features/isa/instruction/api-call/api-call.feature`）、vocab、terminology mapping。
+- **Environment**：toolchain 版本、OS、locale、timezone（時間相關 case 必填）。
+- **Error output / logs**：貼上前移除 credentials 與 token。
+
+### 跨實作不一致的分流
+
+發現多個實作行為不一致時，先判斷屬於哪類，再決定要不要用 bug_report：
+
+| 觀察到的情況 | 走哪 |
+|---|---|
+| 規格明確、單一實作偏離 | **bug_report**，標 `lang:{語言}`（如 `lang:Python`） |
+| 規格模糊、多實作各自解讀 | **spec_or_feature_proposal**（全域 ADR）|
+| 規格明確、屬於該語言合理背離（技術限制）| 走該 sub-package 的[專案 ADR PR](/docs/contributing/implementer/writing-project-adr) |
+| 你不確定屬於哪類 | 用 bug_report，在 Affected area 選 Unsure，由 maintainer 幫你分流 |
+
+---
+
+## spec_or_feature_proposal
+
+**檔案**：`.github/ISSUE_TEMPLATE/spec_or_feature_proposal.yml`
+
+**何時用**：你想新增或修改全域規格（指令、符號、語義、行為、public API、plugin 能力），或提出新指令。這個模板涵蓋草稿中原本分開的「Spec Proposal」與「New Command Request」兩種情境，實務上兩者都收斂為此模板 + ADR draft PR。
+
+**必填欄位**：
+
+- **Problem / motivation**：解決什麼使用者或貢獻者的問題。
+- **Proposal type**：從下拉選單選（可複選）：New instruction、New symbol、New constraint / assertion behavior、New DSL behavior、New public API、New plugin / adapter capability、Cross-language behavior change、Benchmark / fixture scenario、Documentation-visible behavior、Unsure。
+- **Proposed contract**：以 contract 形式描述預期行為，可附 Given/When/Then 範例；說明必要欄位、error 行為、相容性注意。
+- **Validation plan**：說明要怎麼驗證；提及 Java RI、其他語言、benchmark、docs。
+
+**選填**：
+
+- **Contract assets likely affected**：哪些 ADR、feature 檔、vocab、terminology mapping、benchmark 會受影響。
+- **Compatibility / migration impact**：是否 breaking；是否需要 migration note。
+- **Follow-up scope**：已知但刻意不放在第一版 PR 的後續工作。
+
+**何時改走 Discussion 先聊**：方向還不確定、想先驗證社群需求、預期會引起大改動時，先開 Discussion 收斂後再正式開此 issue + ADR draft PR。
+
+---
+
+## architecture_refactor
+
+**檔案**：`.github/ISSUE_TEMPLATE/architecture_refactor.yml`
+
+**何時用**：提出架構或重構方向，且該變更**不應改變公開行為**。若變更涉及指令、符號、constraint、public API 或跨語言 contract，改用 spec_or_feature_proposal。
+
+**必填欄位**：
+
+- **Context**：哪個 component、package 或 layer 需要重構，它的職責是什麼。
+- **Problem**：現有的維護性、架構、可測試性、效能或 release 問題。
+- **Proposed direction**：設計方向與主要邊界。
+- **Behavior boundary**：說明為什麼不會改變公開行為；若有可能改變，明確指出 contract source。
+- **Affected area**：從下拉選單複選（同 bug_report 的選項加上 Repository governance / contributor docs）。
+- **Verification plan**：哪些測試、benchmark、docs 檢查或 release 檢查能證明行為保持不變。
+
+**選填**：
+
+- **Migration / rollout plan**：能否安全拆分；reviewers 應先看哪裡。
+
+---
+
+## ci_release_issue
+
+**檔案**：`.github/ISSUE_TEMPLATE/ci_release_issue.yml`
+
+**何時用**：CI、package 發布、release gate、signing、artifact 處理，或 workflow 權限問題。不要在這裡放 security vulnerability 細節、secrets 或 token。
+
+**必填欄位**：
+
+- **Affected area**：從下拉選單複選（Java release / Maven Central、C# release / NuGet、TypeScript CI / package publishing、Python CI / package publishing、Test workflow、Benchmark workflow、Artifact signing / provenance、Workflow permissions / secrets、Repository metadata、Other）。
+- **Summary**：什麼在失敗，或提出什麼改動。
+- **Security / release impact**：涉及的 permissions、secrets、approval gate、tag、artifact、package publishing、rollback 考量。
+
+**選填**：
+
+- **Evidence / logs**：連結 workflow run 或貼上已移除敏感資訊的 log。
+- **Proposed fix or next step**。
+
+---
+
+## docs_issue
+
+**檔案**：`.github/ISSUE_TEMPLATE/docs_issue.yml`
+
+**何時用**：文件不清楚、過時、缺少、或互相矛盾。若要求文件變更**實際上是新定義行為**，改用 spec_or_feature_proposal。
+
+**必填欄位**：
+
+- **Documentation location**：連結或說明哪個檔案、section、頁面，或缺少的頁面。
+- **What is unclear, missing, outdated, or conflicting**：具體描述問題。
+- **Documentation type**：從下拉選單複選（README / quickstart、Global specs / ADRs、Feature / vocab / terminology docs、Language implementation docs、Benchmark docs、Contributor / governance docs、Release / CI docs、Translation、Broken link / typo）。
+
+**選填**：
+
+- **Source of truth / evidence**：對應的 ADR、feature 檔、vocab、terminology mapping 或 PR。
+- **Suggested fix**：建議的措辭、結構或連結目標。
