@@ -1,6 +1,6 @@
 {
   "title": "Spec Guide",
-  "description": "SpecFormula ISA user documentation",
   "root": true,
+  "description": "SpecFormula ISA user documentation",
   "pages": ["dsl", "isa"]
 }

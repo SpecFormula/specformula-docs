@@ -1,4 +1,4 @@
 {
   "title": "SpecFormula ISA",
-  "pages": ["index", "---快速開始---", "installation", "---開發者指南---", "plugin"]
+  "pages": ["index", "installation", "plugin", "gherkin", "contributing"]
 }

@@ -1,6 +1,6 @@
 {
   "title": "貢獻指南",
-  "description": "如何貢獻規格、實作、benchmark 與文件",
   "root": true,
+  "description": "如何貢獻規格、實作、benchmark 與文件",
   "pages": ["index", "lifecycle", "overview", "spec-author", "implementer", "benchmark", "docs", "reference"]
 }
