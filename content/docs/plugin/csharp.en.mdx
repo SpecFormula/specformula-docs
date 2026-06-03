@@ -1,0 +1,98 @@
+---
+title: C# Plugin Development
+description: Build SpecFormula plugins for C# / .NET / Reqnroll using assembly scanning
+---
+
+C# plugins use runtime assembly scanning. Plugin authors expose a public plugin class implementing `ISpecFormulaPlugin` with a public parameterless constructor; users only add the plugin package or project reference to the test project.
+
+## Scope
+
+Use this page when you need to:
+
+- Build a reusable plugin assembly for C# test projects.
+- Provide new `instruction_type` values.
+- Provide `lifecycle_hooks` or `spec_readers`.
+- Maintain built-in plugins in the C# / Reqnroll implementation.
+
+## Project dependency
+
+A plugin project depends on `SpecFormula.PluginApi`:
+
+```xml
+<ItemGroup>
+  <ProjectReference Include="..\SpecFormula.PluginApi\SpecFormula.PluginApi.csproj" />
+</ItemGroup>
+```
+
+Published plugins can use a NuGet package that provides the same API dependency.
+
+## Discovery rules
+
+The C# runtime scans assemblies in the test output and current AppDomain. The plugin class should be:
+
+- a public concrete class;
+- implementing `ISpecFormulaPlugin`;
+- providing a public parameterless constructor;
+- available in the test output folder.
+
+## Plugin class
+
+```csharp
+using SpecFormula.PluginApi;
+
+public sealed class AuditPlugin : ISpecFormulaPlugin
+{
+    private string _tag = "default";
+
+    public string Id => "audit";
+    public string Version => "1.0.0";
+
+    public void Configure(IPluginContext ctx)
+    {
+        if (ctx.PluginConfig.TryGetValue("tag", out var raw) && raw is string value)
+        {
+            _tag = value;
+        }
+    }
+
+    public IReadOnlyList<IInstruction> Instructions()
+        => [new AuditLogInstruction(_tag)];
+}
+```
+
+## User-side csproj
+
+After the user adds a package or project reference, the plugin assembly must appear in test output:
+
+```xml
+<ItemGroup>
+  <ProjectReference Include="../Example.SpecFormula.AuditPlugin/Example.SpecFormula.AuditPlugin.csproj" />
+</ItemGroup>
+```
+
+A pure SpecFormula plugin usually does not need extra Reqnroll step assembly configuration. Only configure Reqnroll step assemblies if the plugin also provides native Reqnroll Step Definitions.
+
+## User-side isa.yml
+
+Plugin authors should document the plugin id, available instruction types, supported data formats, and disableable contribution names.
+
+```yaml
+plugins:
+  config:
+    audit:
+      tag: ecommerce
+
+instructions:
+  - name: Audit log
+    format: '^record audit:$'
+    instruction_type: audit_log
+    data_format: text
+```
+
+## Verification checklist
+
+- The plugin assembly is copied to test output.
+- The plugin class is public concrete and has a public parameterless constructor.
+- `Id` matches the user's `plugins.config.<id>`.
+- `Instructions()` returns instruction types that do not conflict with other plugins.
+- `disabled.instructions` / `disabled.lifecycle_hooks` / `disabled.spec_readers` names match actual contribution names provided by the plugin.

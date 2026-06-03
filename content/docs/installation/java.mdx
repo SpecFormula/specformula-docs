@@ -1,0 +1,80 @@
+---
+title: Java / Maven
+description: 使用 Maven 與 Cucumber JVM 導入 SpecFormula
+---
+
+Java 實作由多個 Maven module 組成：
+
+| Module | 用途 |
+|--------|------|
+| `specformula-core` | ISA parser、instruction engine、symbol systems。 |
+| `specformula-spring` | Spring bridge、ScenarioContext、HTTP/auth/time adapters。 |
+| `specformula-cucumber` | Cucumber Backend SPI integration。 |
+| `specformula-testcontainer` | Testcontainers database setup and cleanup。 |
+| `specformula-dsl` | DSL preprocessing Maven plugin。 |
+
+## 開發版安裝
+
+在目前 repo 內先安裝 Java modules 到 local Maven repository：
+
+```bash
+cd specformula-java
+mvn clean install -DskipTests
+```
+
+## 測試專案依賴
+
+最小 Cucumber 導入通常需要：
+
+```xml
+<dependencies>
+  <dependency>
+    <groupId>ai.specformula</groupId>
+    <artifactId>specformula-cucumber</artifactId>
+    <version>${specformula.version}</version>
+    <scope>test</scope>
+  </dependency>
+
+  <dependency>
+    <groupId>ai.specformula</groupId>
+    <artifactId>specformula-testcontainer</artifactId>
+    <version>${specformula.version}</version>
+    <scope>test</scope>
+  </dependency>
+</dependencies>
+```
+
+`specformula-cucumber` 會透過 Cucumber Backend SPI 載入 ISA backend；測試執行入口仍是標準 Cucumber / JUnit Platform。
+
+## 啟用 DSL preprocessing
+
+若測試專案使用 `.dsl.feature`，加入 `specformula-dsl` Maven plugin。Java DSL plugin 會在 `generate-test-sources` 階段執行：讀取 source tree，輸出 generated test resources，不修改 build output。
+
+```xml
+<build>
+  <plugins>
+    <plugin>
+      <groupId>ai.specformula</groupId>
+      <artifactId>specformula-dsl</artifactId>
+      <version>${specformula.version}</version>
+      <executions>
+        <execution>
+          <goals>
+            <goal>preprocess</goal>
+          </goals>
+        </execution>
+      </executions>
+    </plugin>
+  </plugins>
+</build>
+```
+
+若要在 Cucumber 報錯時回溯 DSL source，可依目前實作加入 `specformula-dsl` 的 test-time dependency / plugin support。
+
+## 執行測試
+
+```bash
+mvn test
+```
+
+

@@ -1,0 +1,92 @@
+---
+title: C# / Reqnroll
+description: 使用 .NET、Reqnroll 與 xUnit 導入 SpecFormula
+---
+
+C# 實作目前基於 .NET 10 與 Reqnroll 3。開發版以 ProjectReference 導入；正式 NuGet 套件發佈後，這一頁應更新為 `dotnet add package` 指令。
+
+## 模組
+
+| Project | 用途 |
+|---------|------|
+| `SpecFormula.Core` | ISA parser、instruction engine、symbol systems。 |
+| `SpecFormula.AspNetCore` | ASP.NET Core bridge、HTTP/auth/time adapters。 |
+| `SpecFormula.Reqnroll` | Reqnroll plugin、dynamic Step registration、hooks。 |
+| `SpecFormula.Testcontainers` | PostgreSQL / MySQL / MSSQL test containers。 |
+| `SpecFormula.Dsl` | DSL preprocessing CLI / MSBuild integration。 |
+
+## 測試專案參考
+
+開發版測試專案可先使用 ProjectReference：
+
+```xml
+<ItemGroup>
+  <ProjectReference Include="..\..\specformula-csharp\src\SpecFormula.Core\SpecFormula.Core.csproj" />
+  <ProjectReference Include="..\..\specformula-csharp\src\SpecFormula.AspNetCore\SpecFormula.AspNetCore.csproj" />
+  <ProjectReference Include="..\..\specformula-csharp\src\SpecFormula.Reqnroll\SpecFormula.Reqnroll.csproj" />
+  <ProjectReference Include="..\..\specformula-csharp\src\SpecFormula.Testcontainers\SpecFormula.Testcontainers.csproj" />
+</ItemGroup>
+```
+
+測試框架依賴：
+
+```xml
+<ItemGroup>
+  <PackageReference Include="Reqnroll.xUnit" Version="3.*" />
+  <PackageReference Include="xunit" Version="2.*" />
+  <PackageReference Include="xunit.runner.visualstudio" Version="2.*" />
+  <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.*" />
+</ItemGroup>
+```
+
+## reqnroll.json
+
+Reqnroll 需要載入 SpecFormula plugin assembly：
+
+```json
+{
+  "$schema": "https://schemas.reqnroll.net/reqnroll-config-latest.json",
+  "stepAssemblies": [
+    { "assembly": "SpecFormula.ReqnrollPlugin" },
+    { "assembly": "SpecFormula.Testcontainers" }
+  ]
+}
+```
+
+`SpecFormula.Testcontainers` 只有在需要由框架啟動測試資料庫容器時才需要。
+
+## 啟用 DSL preprocessing
+
+若測試專案使用 `.dsl.feature`，加入 `SpecFormula.Dsl`。C# 的 DSL 編譯採 in-place overwrite 策略，因此必須明確 opt-in：
+
+```xml
+<PropertyGroup>
+  <SpecFormulaDslInPlaceOverwrite>true</SpecFormulaDslInPlaceOverwrite>
+</PropertyGroup>
+
+<ItemGroup>
+  <ProjectReference Include="..\..\specformula-csharp\src\SpecFormula.Dsl\SpecFormula.Dsl.csproj" ReferenceOutputAssembly="false" />
+</ItemGroup>
+
+<Import Project="..\..\specformula-csharp\src\SpecFormula.Dsl\build\SpecFormula.Dsl.props" Condition="Exists('..\..\specformula-csharp\src\SpecFormula.Dsl\build\SpecFormula.Dsl.props')" />
+<Import Project="..\..\specformula-csharp\src\SpecFormula.Dsl\build\SpecFormula.Dsl.targets" Condition="Exists('..\..\specformula-csharp\src\SpecFormula.Dsl\build\SpecFormula.Dsl.targets')" />
+```
+
+注意：C# DSL preprocessing 會在 Reqnroll compile-time hook 前把 `.dsl.feature` 展開成 ISA text。請只在測試專案中啟用，並確保 source control 能清楚顯示 generated/in-place 差異。
+
+## 複製規格資源
+
+```xml
+<ItemGroup>
+  <None Update="isa.yml" CopyToOutputDirectory="PreserveNewest" />
+  <None Update="dsl.yml" CopyToOutputDirectory="PreserveNewest" />
+  <None Update="specs\**\*" CopyToOutputDirectory="PreserveNewest" />
+  <Content Include="reqnroll.json" CopyToOutputDirectory="PreserveNewest" />
+</ItemGroup>
+```
+
+## 執行測試
+
+```bash
+dotnet test
+```

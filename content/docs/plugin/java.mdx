@@ -1,0 +1,108 @@
+---
+title: Java Plugin 開發
+description: 使用 ServiceLoader 建立 Java / Maven / Cucumber JVM 的 SpecFormula Plugin
+---
+
+Java Plugin 使用 Java 原生 `ServiceLoader` discovery。Plugin 作者負責把 `SpecFormulaPlugin` 實作與 `META-INF/services` metadata 打包進 plugin JAR；使用者只需要在測試專案加入 Maven dependency。
+
+## 適用範圍
+
+本頁適用於：
+
+- 建立可被多個 Java 測試專案重用的 plugin JAR。
+- 提供新的 `instruction_type`。
+- 提供 `lifecycle_hooks` 或 `spec_readers`。
+- 維護 Java reference implementation 的內建 plugin。
+
+## 模組與依賴
+
+Plugin module 需要依賴 `specformula-plugin-api`：
+
+```xml
+<dependency>
+  <groupId>ai.specformula</groupId>
+  <artifactId>specformula-plugin-api</artifactId>
+  <version>${specformula.version}</version>
+</dependency>
+```
+
+第三方 plugin 不應依賴 `specformula-cucumber` 的 BDD 型別來實作 executor。Plugin executor 應使用 plugin API 提供的 invocation / payload abstraction，讓 BDD adapter 留在 SpecFormula runtime 內。
+
+## Plugin class
+
+```java
+package com.example.specformula.audit;
+
+import ai.specformula.plugin.PluginContext;
+import ai.specformula.plugin.SpecFormulaPlugin;
+import ai.specformula.plugin.Instruction;
+import java.util.List;
+
+public final class AuditPlugin implements SpecFormulaPlugin {
+    private String tag = "default";
+
+    @Override
+    public String id() {
+        return "audit";
+    }
+
+    @Override
+    public String version() {
+        return "1.0.0";
+    }
+
+    @Override
+    public void configure(PluginContext ctx) {
+        Object configuredTag = ctx.pluginConfig().get("tag");
+        if (configuredTag instanceof String value) {
+            tag = value;
+        }
+    }
+
+    @Override
+    public List<Instruction> instructions() {
+        return List.of(new AuditLogInstruction(tag));
+    }
+}
+```
+
+## ServiceLoader metadata
+
+Plugin JAR 必須包含：
+
+```text
+META-INF/services/ai.specformula.plugin.SpecFormulaPlugin
+```
+
+內容是 plugin class 的 fully qualified name：
+
+```text
+com.example.specformula.audit.AuditPlugin
+```
+
+這是 Java plugin 與 C# plugin 最大差異：Java 依靠 `ServiceLoader` 與 service metadata；C# 則依靠 assembly scanning。
+
+## 使用者端 isa.yml
+
+Plugin 作者應在文件中明確列出 plugin id、可用 instruction type、支援的 data format，以及可停用的 contribution 名稱。
+
+```yaml
+plugins:
+  config:
+    audit:
+      tag: ecommerce
+
+instructions:
+  - name: 記錄 audit
+    format: '^記錄 audit:$'
+    instruction_type: audit_log
+    data_format: text
+```
+
+## 驗證重點
+
+- plugin JAR 已包含 `META-INF/services/ai.specformula.plugin.SpecFormulaPlugin`。
+- `id()` 與使用者 `plugins.config.<id>` 一致。
+- `instructions()` 回傳的 `instructionType` 不與其他 plugin 衝突。
+- `supportedDataFormats` 包含使用者文件中的 `data_format`。
+- `disabled.instructions` / `disabled.lifecycle_hooks` / `disabled.spec_readers` 名稱與 plugin 實際提供的 contribution 名稱一致。

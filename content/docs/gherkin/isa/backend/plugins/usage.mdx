@@ -1,0 +1,78 @@
+---
+title: 使用 Plugin Instruction
+description: 在 isa.yml 與 .isa.feature 中使用已安裝 plugin 提供的 instruction
+---
+
+安裝並配置 plugin 後，測試專案通常會在 `isa.yml instructions[]` 中加入 plugin 提供的 `instruction_type`，再於 `.isa.feature` 撰寫對應 Step。
+
+## 1. 在 isa.yml 宣告 instruction
+
+```yaml
+plugins:
+  config:
+    audit:
+      tag: ecommerce
+
+instructions:
+  - name: 記錄 audit
+    format: '^記錄 audit:$'
+    instruction_type: audit_log
+    data_format: text
+```
+
+重點：
+
+- `instruction_type` 必須是 plugin 文件列出的值。
+- `format` 是 `.isa.feature` 中 Step 文字要符合的 pattern。
+- 如果 Step 需要 DocString 或 DataTable，請依 plugin 文件設定 `data_format`。
+- 如果 plugin instruction 不需要 payload，可以省略 `data_format`；effective value 會是 `none`。
+
+## 2. 在 .isa.feature 使用 Step
+
+```gherkin
+Then 記錄 audit:
+  """
+  item created
+  """
+```
+
+執行時，SpecFormula 會用 `format` 找到這個 instruction，確認 `data_format` 被 plugin 支援，然後把 payload 交給 plugin。
+
+## data_format 選擇
+
+| payload | `data_format` |
+|---------|---------------|
+| 沒有 payload | `none` 或省略 |
+| DataTable | `data_table` |
+| JSON DocString | `json` |
+| 一般文字 DocString | `text` |
+
+`data_format` 是 plugin instruction 的 payload contract。若 plugin 文件說 `audit_log` 只支援 `text`，但 `isa.yml` 寫成 `data_table`，啟動應該失敗。
+
+## JSON 事件驗證例子
+
+```yaml
+plugins:
+  config:
+    event:
+      topic: order-events
+      mode: strict
+
+instructions:
+  - name: 應發布付款事件
+    format: '^應發布付款事件 JSON:$'
+    instruction_type: event_validate
+    data_format: json
+```
+
+```gherkin
+Then 應發布付款事件 JSON:
+  """json
+  {
+    "eventType": "ORDER_PAID",
+    "orderId": "$LastOrder.id"
+  }
+  """
+```
+
+如果不想使用這個 plugin 提供的 debug instruction 或某些 `lifecycle_hooks`，請回到 [Plugin 配置](/docs/gherkin/isa/backend/plugins/configuration) 設定 `disabled`。

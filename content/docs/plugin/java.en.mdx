@@ -1,0 +1,108 @@
+---
+title: Java Plugin Development
+description: Build SpecFormula plugins for Java / Maven / Cucumber JVM using ServiceLoader
+---
+
+Java plugins use Java's native `ServiceLoader` discovery. Plugin authors package both the `SpecFormulaPlugin` implementation and `META-INF/services` metadata into the plugin JAR; users only add a Maven dependency to their test project.
+
+## Scope
+
+Use this page when you need to:
+
+- Build a reusable plugin JAR for Java test projects.
+- Provide new `instruction_type` values.
+- Provide `lifecycle_hooks` or `spec_readers`.
+- Maintain built-in plugins in the Java reference implementation.
+
+## Module dependency
+
+A plugin module depends on `specformula-plugin-api`:
+
+```xml
+<dependency>
+  <groupId>ai.specformula</groupId>
+  <artifactId>specformula-plugin-api</artifactId>
+  <version>${specformula.version}</version>
+</dependency>
+```
+
+Third-party plugins should not depend on `specformula-cucumber` BDD types for executor logic. Executors should use plugin API invocation / payload abstractions and leave BDD adaptation inside the SpecFormula runtime.
+
+## Plugin class
+
+```java
+package com.example.specformula.audit;
+
+import ai.specformula.plugin.PluginContext;
+import ai.specformula.plugin.SpecFormulaPlugin;
+import ai.specformula.plugin.Instruction;
+import java.util.List;
+
+public final class AuditPlugin implements SpecFormulaPlugin {
+    private String tag = "default";
+
+    @Override
+    public String id() {
+        return "audit";
+    }
+
+    @Override
+    public String version() {
+        return "1.0.0";
+    }
+
+    @Override
+    public void configure(PluginContext ctx) {
+        Object configuredTag = ctx.pluginConfig().get("tag");
+        if (configuredTag instanceof String value) {
+            tag = value;
+        }
+    }
+
+    @Override
+    public List<Instruction> instructions() {
+        return List.of(new AuditLogInstruction(tag));
+    }
+}
+```
+
+## ServiceLoader metadata
+
+The plugin JAR must contain:
+
+```text
+META-INF/services/ai.specformula.plugin.SpecFormulaPlugin
+```
+
+The file content is the fully qualified plugin class name:
+
+```text
+com.example.specformula.audit.AuditPlugin
+```
+
+This is the main difference from C#: Java uses `ServiceLoader` and service metadata; C# uses assembly scanning.
+
+## User-side isa.yml
+
+Plugin authors should document the plugin id, available instruction types, supported data formats, and disableable contribution names.
+
+```yaml
+plugins:
+  config:
+    audit:
+      tag: ecommerce
+
+instructions:
+  - name: Audit log
+    format: '^record audit:$'
+    instruction_type: audit_log
+    data_format: text
+```
+
+## Verification checklist
+
+- The plugin JAR contains `META-INF/services/ai.specformula.plugin.SpecFormulaPlugin`.
+- `id()` matches the user's `plugins.config.<id>`.
+- `instructions()` returns `instructionType` values that do not conflict with other plugins.
+- `supportedDataFormats` includes the `data_format` values shown in user documentation.
+- `disabled.instructions` / `disabled.lifecycle_hooks` / `disabled.spec_readers` names match actual contribution names provided by the plugin.

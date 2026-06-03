@@ -1,0 +1,379 @@
+---
+title: SpecFormula DSL
+description: Define readable business Steps in dsl.yml and expand them into ISA Steps
+---
+
+SpecFormula DSL lets you write test cases with business-readable sentences first, then expands those sentences into SpecFormula ISA Steps during the build.
+
+In short:
+
+- `.dsl.feature`: the test case people read and maintain.
+- `dsl.yml`: tells SpecFormula how a DSL Step expands into one or more ISA Steps.
+- `.isa.feature`: the expanded result executed by the SpecFormula ISA backend.
+- `isa.yml`: defines how ISA Steps map to API calls, data setup, response validation, and other instructions.
+
+## When should I use DSL?
+
+Use DSL when ISA Steps are too detailed or too technical for readable test cases.
+
+Instead of writing this in every scenario:
+
+```gherkin
+Given prepare a user, with table:
+  | >Alice.id | name  | email             | passwordHash | role  | status |
+  | <userId   | Alice | alice@example.com | pass123      | BUYER | ACTIVE |
+```
+
+You can write this in `.dsl.feature`:
+
+```gherkin
+Given "Alice" is a buyer
+```
+
+Then define how that sentence expands in `dsl.yml`.
+
+## Where do files go?
+
+Put `.dsl.feature` and `dsl.yml` in the test resources area. `dsl.yml` can live at the root, or be split by folder; the build scans folders for `dsl.yml` files.
+
+```text
+src/test/resources/
+├── isa.yml
+├── dsl.yml
+├── roles/
+│   ├── dsl.yml
+│   └── buyer.dsl.feature
+└── checkout/
+    ├── dsl.yml
+    └── checkout.dsl.feature
+```
+
+A root `dsl.yml` is good for shared DSL definitions. Folder-level `dsl.yml` files are good for domain-specific DSL definitions.
+
+## Basic dsl.yml structure
+
+The top-level key is `dsl_steps`. Each `dsl_steps[]` item defines one sentence that can be used in `.dsl.feature` files.
+
+```yaml
+dsl_steps:
+  - name: Buyer setup
+    format: '^"(?<alias>[^"]+)" is a buyer$'
+    params:
+      password: pass123
+    isa_steps:
+      - instruction: 'prepare a user, with table:'
+        table:
+          '>{{alias}}.id': '<userId'
+          name: '{{alias}}'
+          email: '{{alias}}@example.com'
+          passwordHash: '{{password}}'
+          role: BUYER
+          status: ACTIVE
+```
+
+This means: when `.dsl.feature` contains `"Alice" is a buyer`, it expands into a `prepare a user, with table:` ISA Step.
+
+## dsl_steps fields
+
+| Field | Required | Description |
+|-------|----------|-------------|
+| `name` | Yes | Name of the DSL definition, used in errors and debugging. It must be unique across the scanned DSL files. |
+| `format` | Yes | Regex that matches the Step text in `.dsl.feature`. It must match the whole sentence with `^` and `$`. |
+| `params` | No | Extra parameters and default values. Useful for defaults or values that may be overridden later. |
+| `isa_steps` | Yes | One or more ISA Steps produced by this DSL Step. |
+
+## format: capture variables from the DSL Step
+
+`format` is a regex. Use named groups to capture variables from the sentence:
+
+```yaml
+format: '^"(?<buyerAlias>[^"]+)" buys "(?<productAlias>[^"]+)"$'
+```
+
+This Step:
+
+```gherkin
+When "Alice" buys "iPhone"
+```
+
+captures:
+
+| Variable | Value |
+|----------|-------|
+| `buyerAlias` | `Alice` |
+| `productAlias` | `iPhone` |
+
+Use `{{buyerAlias}}` and `{{productAlias}}` in `isa_steps` to reference those values.
+
+## params: defaults and overridable parameters
+
+`params` can provide default values:
+
+```yaml
+params:
+  quantity: 1
+```
+
+Then use the value in `isa_steps`:
+
+```yaml
+'items[0].quantity': '{{quantity}}'
+```
+
+Common uses:
+
+- Keep common defaults in `dsl.yml`.
+- Avoid repeating technical fields in every `.dsl.feature` file.
+- Leave room for PM / QA table or JSON inputs to override values later.
+
+## isa_steps: expand into ISA Steps
+
+`isa_steps` is the list of ISA Steps that will be produced. Each item must at least contain `instruction`.
+
+### Expand into a Step without payload
+
+```yaml
+isa_steps:
+  - instruction: 'system should have {{count}} users'
+```
+
+Output:
+
+```gherkin
+Then system should have 2 users
+```
+
+### Expand into a DataTable Step
+
+```yaml
+isa_steps:
+  - instruction: 'prepare a user, with table:'
+    table:
+      '>{{alias}}.id': '<userId'
+      name: '{{alias}}'
+      email: '{{alias}}@example.com'
+      role: BUYER
+```
+
+Output:
+
+```gherkin
+Given prepare a user, with table:
+  | >Alice.id | name  | email             | role  |
+  | <userId   | Alice | Alice@example.com | BUYER |
+```
+
+### Expand into a text DocString
+
+If the ISA instruction has `data_format: text`, use `text`:
+
+```yaml
+isa_steps:
+  - instruction: 'write audit:'
+    text: |
+      buyer={{buyerAlias}}
+      product={{productAlias}}
+```
+
+Output:
+
+```gherkin
+Then write audit:
+  """
+  buyer=Alice
+  product=iPhone
+  """
+```
+
+### Expand into a JSON DocString
+
+If the ISA instruction has `data_format: json`, you can write key/value pairs with `table`; the build renders them as a JSON DocString:
+
+```yaml
+isa_steps:
+  - instruction: 'send event JSON:'
+    table:
+      buyer: '{{buyerAlias}}'
+      product: '{{productAlias}}'
+```
+
+Output:
+
+```gherkin
+When send event JSON:
+  """json
+  {
+    "buyer": "Alice",
+    "product": "iPhone"
+  }
+  """
+```
+
+Whether output becomes a DataTable or DocString depends on the matched instruction's `data_format` in `isa.yml`.
+
+## Complete example: one DSL Step expands into multiple ISA Steps
+
+The strongest use case for DSL is not only renaming one sentence. A DSL Step can represent one business action and expand into a full ISA flow.
+
+In the example below, QA writes only one line in `.dsl.feature`:
+
+```gherkin
+When "Alice" buys 2 "iPhone" from "Apple Store" using credit card
+```
+
+The build expands it into multiple ISA Steps: seed inventory, call the order API, validate the response, validate database state, and validate the payment event.
+
+### 1. Define the DSL Step in dsl.yml
+
+```yaml
+dsl_steps:
+  - name: Buyer completes credit-card purchase
+    format: '^"(?<buyerAlias>[^"]+)" buys (?<quantity>\d+) "(?<productAlias>[^"]+)" from "(?<shopAlias>[^"]+)" using credit card$'
+    params:
+      currency: TWD
+      paymentMethod: CREDIT_CARD
+      expectedOrderStatus: PAID
+      expectedEventType: ORDER_PAID
+    isa_steps:
+      - instruction: 'prepare product inventory, with table:'
+        table:
+          '>Inventory.id': '<inventoryId'
+          productId: '${{productAlias}}.id'
+          shopId: '${{shopAlias}}Shop.id'
+          availableQuantity: 10
+
+      - instruction: '(UID="${{buyerAlias}}.id") create order, call table:'
+        table:
+          '>LastOrder.id': '<orderId'
+          shopId: '${{shopAlias}}Shop.id'
+          currency: '{{currency}}'
+          paymentMethod: '{{paymentMethod}}'
+          'items[0].productId': '${{productAlias}}.id'
+          'items[0].quantity': '{{quantity}}'
+
+      - instruction: 'create order(201) response, with table:'
+        table:
+          '>LastOrder.id': '<orderId'
+          status: '{{expectedOrderStatus}}'
+          currency: '{{currency}}'
+          paid: true
+          totalAmount: '&gt(0)'
+
+      - instruction: 'order database should match, with table:'
+        table:
+          orderId: '$LastOrder.id'
+          buyerId: '${{buyerAlias}}.id'
+          shopId: '${{shopAlias}}Shop.id'
+          status: '{{expectedOrderStatus}}'
+          itemCount: '{{quantity}}'
+
+      - instruction: 'payment event should be published JSON:'
+        table:
+          eventType: '{{expectedEventType}}'
+          orderId: '$LastOrder.id'
+          buyerId: '${{buyerAlias}}.id'
+          productId: '${{productAlias}}.id'
+          quantity: '{{quantity}}'
+```
+
+The important part is that `isa_steps` is a list, so one DSL Step can output more than one ISA Step. Every generated `instruction` must still match one rule in `isa.yml instructions[]`.
+
+### 2. Use the DSL Step in .dsl.feature
+
+```gherkin
+Feature: Credit-card checkout
+
+  Example: buyer completes a credit-card purchase
+    When "Alice" buys 2 "iPhone" from "Apple Store" using credit card
+```
+
+### 3. Build expands it into ISA Steps
+
+```gherkin
+Feature: Credit-card checkout
+
+  Example: buyer completes a credit-card purchase
+    Given prepare product inventory, with table:
+      | >Inventory.id | productId  | shopId              | availableQuantity |
+      | <inventoryId  | $iPhone.id | $Apple StoreShop.id | 10                |
+
+    When (UID="$Alice.id") create order, call table:
+      | >LastOrder.id | shopId              | currency | paymentMethod | items[0].productId | items[0].quantity |
+      | <orderId      | $Apple StoreShop.id | TWD      | CREDIT_CARD   | $iPhone.id          | 2                 |
+
+    Then create order(201) response, with table:
+      | >LastOrder.id | status | currency | paid | totalAmount |
+      | <orderId      | PAID   | TWD      | true | &gt(0)      |
+
+    Then order database should match, with table:
+      | orderId       | buyerId   | shopId              | status | itemCount |
+      | $LastOrder.id | $Alice.id | $Apple StoreShop.id | PAID   | 2         |
+
+    Then payment event should be published JSON:
+      """json
+      {
+        "eventType": "ORDER_PAID",
+        "orderId": "$LastOrder.id",
+        "buyerId": "$Alice.id",
+        "productId": "$iPhone.id",
+        "quantity": "2"
+      }
+      """
+```
+
+This keeps `.dsl.feature` business-readable while preserving explicit ISA validation for API calls, responses, database state, and event payloads.
+
+## Relationship with isa.yml
+
+`dsl.yml` does not define APIs, databases, or instruction types. It only transforms one DSL Step into one or more ISA Steps.
+
+The actual behavior is defined by `isa.yml`:
+
+```yaml
+instructions:
+  - name: Prepare product inventory
+    format: '^prepare product inventory, with table:$'
+    instruction_type: database_seed
+    data_format: data_table
+
+  - name: Create order
+    format: '^\(UID="(?<uid>[^\"]+)"\) create order, call table:$'
+    instruction_type: api_call
+    data_format: data_table
+
+  - name: Create order response
+    format: '^create order\((?<status>\d+)\) response, with table:$'
+    instruction_type: response_validate
+    data_format: data_table
+
+  - name: Validate order database
+    format: '^order database should match, with table:$'
+    instruction_type: database_validate
+    data_format: data_table
+
+  - name: Validate payment event
+    format: '^payment event should be published JSON:$'
+    instruction_type: event_validate
+    data_format: json
+```
+
+When designing DSL definitions, first make sure every generated `instruction` already matches an `isa.yml` instruction.
+
+## Next steps
+
+This page focuses on how to design DSL Steps in `dsl.yml`, and how one DSL Step can compose multiple ISA Steps.
+
+For enabling DSL preprocessing in a real project, see the quick start / installation pages:
+
+- [Java / Maven](/docs/installation/java)
+- [C# / Reqnroll](/docs/installation/csharp)
+
+## Common errors
+
+| Error | Common cause | Fix |
+|-------|--------------|-----|
+| `dsl.yml` cannot be found | File is outside the test resource scan path | Put `dsl.yml` under test resources, or configure the DSL plugin source/config path. |
+| DSL Step is not expanded | `format` regex does not match the Step text | Make sure `format` has `^` / `$`, and test that named groups capture the intended text. |
+| Expanded Step has no ISA instruction | `isa_steps[].instruction` does not match `isa.yml instructions[].format` | Paste the expanded text into `.isa.feature` first, then fix `instruction` or the `isa.yml` regex. |
+| `{{variable}}` is not replaced | Variable is neither a `format` named group nor a `params` key | Fix the named group, `params` key, or template reference. |
+| Payload format error | `table` / `text` does not match ISA `data_format` | Use `table` for `data_table` / `json`; use `text` for `text`; use no payload for `none`. |

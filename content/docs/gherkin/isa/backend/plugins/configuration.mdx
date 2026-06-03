@@ -1,0 +1,125 @@
+---
+title: Plugin 配置
+description: 使用 isa.yml plugins.config 設定與停用已安裝的 plugin 功能
+---
+
+Plugin 的使用者設定放在 `isa.yml` 的 top-level `plugins.config`。每個 plugin 會定義自己的 plugin id 與設定欄位；請以 plugin 文件提供的 schema 為準。
+
+## 基本格式
+
+```yaml
+plugins:
+  config:
+    audit:
+      tag: ecommerce
+      mode: strict
+```
+
+上例中：
+
+- `audit` 是 plugin id。
+- `tag` 與 `mode` 是該 plugin 定義的設定。
+- SpecFormula 會在啟動時把 `plugins.config.audit` 傳給 `audit` plugin。
+
+## 配置 plugin instruction
+
+`plugins.config` 只設定 plugin 本身。要在 `.isa.feature` 使用 plugin 提供的 Step，還需要在 `instructions[]` 引用 plugin 的 `instruction_type`：
+
+```yaml
+plugins:
+  config:
+    audit:
+      tag: ecommerce
+      mode: strict
+
+instructions:
+  - name: 記錄 audit
+    format: '^記錄 audit:$'
+    instruction_type: audit_log
+    data_format: text
+```
+
+## 停用 plugin instruction
+
+如果 plugin 提供多個 instruction，但測試專案只想使用其中一部分，可以停用不需要的 instruction：
+
+```yaml
+plugins:
+  config:
+    audit:
+      disabled:
+        instructions:
+          - audit_debug
+          - audit_dump_context
+```
+
+停用後：
+
+- `audit_debug` 與 `audit_dump_context` 不會被註冊。
+- 如果 `instructions[]` 仍引用被停用的 `instruction_type`，啟動應該失敗。
+- 如果名稱拼錯，啟動也應該失敗，避免設定 typo silently no-op。
+
+## 停用 lifecycle_hooks
+
+有些 plugin 會提供 `lifecycle_hooks`，用來在測試執行前後處理外部資源，例如重設 Redis state、清空 mock server state、整理事件 topic，或產生測試報告。
+
+若 plugin 文件列出可停用的 lifecycle hook 名稱，可以在 `disabled.lifecycle_hooks` 停用：
+
+```yaml
+plugins:
+  config:
+    redis:
+      uri: redis://localhost:6379
+      key_prefix: test:
+      disabled:
+        lifecycle_hooks:
+          - redis_state_reset
+```
+
+常見用途：
+
+- 本機除錯時暫時保留外部資源狀態。
+- CI 中只想使用 plugin 的 instruction，不想啟用該 plugin 的某些 lifecycle hooks。
+- lifecycle hook 的效果已由另一個環境機制處理，例如 test container reset 或獨立 teardown job。
+
+請注意：停用 lifecycle hook 可能改變測試隔離、資源重設或報告產生行為。若要在 CI 停用，應該確認有其他替代機制。
+
+## 停用其他 plugin 功能
+
+如果 plugin 文件列出其他可停用項目，依文件使用對應名稱。例如：
+
+```yaml
+plugins:
+  config:
+    audit:
+      disabled:
+        spec_readers:
+          - audit_catalog
+```
+
+一般測試專案多半只需要停用 `instructions` 或 `lifecycle_hooks`。更底層的項目若不確定用途，建議不要設定。
+
+## 覆蓋內建功能
+
+如果第三方 plugin 要覆蓋內建 instruction，必須明確設定：
+
+```yaml
+plugins:
+  config:
+    custom-http:
+      override_builtin: true
+```
+
+這個設定用來避免不小心用第三方 plugin 改變內建行為。一般 plugin 使用者不應該設定它，除非 plugin 文件明確要求。
+
+## 常見錯誤
+
+| 狀況 | 處理方式 |
+|------|----------|
+| `plugins.config.<id>` 找不到對應 plugin | 確認 plugin 套件已安裝，且 plugin id 與文件一致。 |
+| 停用不存在的 instruction / lifecycle hook | 修正 `disabled.*` 名稱，或確認目前 plugin 版本是否支援該項目。 |
+| 使用已停用的 `instruction_type` | 移除 disabled 設定，或改用其他 instruction。 |
+| 停用 lifecycle hook 後測試互相污染或少了報告 | 恢復該 lifecycle hook，或提供其他隔離/清理/報告機制。 |
+| 覆蓋內建功能但未設定 `override_builtin` | 若確定要覆蓋，加入 `override_builtin: true`。 |
+
+下一步：到 [使用 Plugin Instruction](/docs/gherkin/isa/backend/plugins/usage) 把 plugin instruction 寫進 `.isa.feature`。

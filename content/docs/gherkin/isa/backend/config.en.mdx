@@ -189,7 +189,40 @@ Given prepare a user, with table:
 | `name` | Instruction name (for identification and error messages) |
 | `format` | Regular expression to match Gherkin Steps |
 | `instruction_type` | Corresponding ISA instruction type |
-| `data_format` | Data format: `data_table` (default), `json` |
+| `data_format` | Step payload format: `none`, `data_table`, `json`, `text`. If omitted, the default depends on `instruction_type`. |
+
+### data_format payload contract
+
+`data_format` describes whether a Step has a DataTable or DocString payload, and how DocString content is parsed. This is a shared contract between ISA and every language runtime.
+
+| data_format | Payload | Usage |
+|-------------|---------|-------|
+| `none` | No payload | Instructions without DataTable / DocString; `custom` defaults to `none`. |
+| `data_table` | Gherkin DataTable | Table-based data setup, API call, response validation, and entity validation. |
+| `json` | JSON DocString | JSON body, JSON response expectation, or JSON entity payload. |
+| `text` | Text DocString | Plain-text payload; if a Step uses a text DocString, set `data_format: text` explicitly. |
+
+Default rules:
+
+- Built-in ISA instructions default to `data_table` when `data_format` is omitted.
+- `instruction_type: custom` defaults to `none` when `data_format` is omitted; the user-defined Step Definition owns the behavior and the ISA runtime does not parse a payload.
+- JSON DocString steps must set `data_format: json`.
+- Plain-text DocString steps must set `data_format: text` to avoid being treated as no-payload or JSON.
+
+Example:
+
+```yaml
+instructions:
+  - name: Custom log message
+    format: ^log message:$
+    instruction_type: custom
+    data_format: text
+
+  - name: Custom checkpoint
+    format: ^mark checkpoint (?P<name>.+)$
+    instruction_type: custom
+    # data_format omitted; custom defaults to none
+```
 
 ### Instruction Type Reference
 

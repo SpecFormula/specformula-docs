@@ -1,0 +1,92 @@
+---
+title: C# / Reqnroll
+description: Adopt SpecFormula with .NET, Reqnroll, and xUnit
+---
+
+The C# implementation currently targets .NET 10 and Reqnroll 3. The development version uses ProjectReference; once official NuGet packages are released, this page should be updated with `dotnet add package` commands.
+
+## Projects
+
+| Project | Purpose |
+|---------|---------|
+| `SpecFormula.Core` | ISA parser, instruction engine, and symbol systems. |
+| `SpecFormula.AspNetCore` | ASP.NET Core bridge, HTTP/auth/time adapters. |
+| `SpecFormula.Reqnroll` | Reqnroll plugin, dynamic Step registration, hooks. |
+| `SpecFormula.Testcontainers` | PostgreSQL / MySQL / MSSQL test containers. |
+| `SpecFormula.Dsl` | DSL preprocessing CLI / MSBuild integration. |
+
+## Test project references
+
+Development test projects can use ProjectReference:
+
+```xml
+<ItemGroup>
+  <ProjectReference Include="..\..\specformula-csharp\src\SpecFormula.Core\SpecFormula.Core.csproj" />
+  <ProjectReference Include="..\..\specformula-csharp\src\SpecFormula.AspNetCore\SpecFormula.AspNetCore.csproj" />
+  <ProjectReference Include="..\..\specformula-csharp\src\SpecFormula.Reqnroll\SpecFormula.Reqnroll.csproj" />
+  <ProjectReference Include="..\..\specformula-csharp\src\SpecFormula.Testcontainers\SpecFormula.Testcontainers.csproj" />
+</ItemGroup>
+```
+
+Test framework dependencies:
+
+```xml
+<ItemGroup>
+  <PackageReference Include="Reqnroll.xUnit" Version="3.*" />
+  <PackageReference Include="xunit" Version="2.*" />
+  <PackageReference Include="xunit.runner.visualstudio" Version="2.*" />
+  <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.*" />
+</ItemGroup>
+```
+
+## reqnroll.json
+
+Reqnroll must load SpecFormula plugin assemblies:
+
+```json
+{
+  "$schema": "https://schemas.reqnroll.net/reqnroll-config-latest.json",
+  "stepAssemblies": [
+    { "assembly": "SpecFormula.ReqnrollPlugin" },
+    { "assembly": "SpecFormula.Testcontainers" }
+  ]
+}
+```
+
+`SpecFormula.Testcontainers` is only needed when the framework should start database containers.
+
+## Enable DSL preprocessing
+
+If the test project uses `.dsl.feature`, add `SpecFormula.Dsl`. The C# DSL compiler uses an in-place overwrite strategy, so explicit opt-in is required:
+
+```xml
+<PropertyGroup>
+  <SpecFormulaDslInPlaceOverwrite>true</SpecFormulaDslInPlaceOverwrite>
+</PropertyGroup>
+
+<ItemGroup>
+  <ProjectReference Include="..\..\specformula-csharp\src\SpecFormula.Dsl\SpecFormula.Dsl.csproj" ReferenceOutputAssembly="false" />
+</ItemGroup>
+
+<Import Project="..\..\specformula-csharp\src\SpecFormula.Dsl\build\SpecFormula.Dsl.props" Condition="Exists('..\..\specformula-csharp\src\SpecFormula.Dsl\build\SpecFormula.Dsl.props')" />
+<Import Project="..\..\specformula-csharp\src\SpecFormula.Dsl\build\SpecFormula.Dsl.targets" Condition="Exists('..\..\specformula-csharp\src\SpecFormula.Dsl\build\SpecFormula.Dsl.targets')" />
+```
+
+C# DSL preprocessing expands `.dsl.feature` into ISA text before Reqnroll's compile-time hook. Enable it only in test projects and keep generated/in-place differences visible in source control.
+
+## Copy spec resources
+
+```xml
+<ItemGroup>
+  <None Update="isa.yml" CopyToOutputDirectory="PreserveNewest" />
+  <None Update="dsl.yml" CopyToOutputDirectory="PreserveNewest" />
+  <None Update="specs\**\*" CopyToOutputDirectory="PreserveNewest" />
+  <Content Include="reqnroll.json" CopyToOutputDirectory="PreserveNewest" />
+</ItemGroup>
+```
+
+## Run tests
+
+```bash
+dotnet test
+```
