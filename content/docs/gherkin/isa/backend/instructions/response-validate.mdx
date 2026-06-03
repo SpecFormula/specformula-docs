@@ -63,6 +63,60 @@ Then 查詢訂單(200)回應, with table:
   | $order1.id    | 商品A              | 商品B              |
 ```
 
+### Key 含 `.` 的逃脫語法
+
+當 JSON key 本身包含 `.` 字元時，使用 `["..."]` bracket notation 避免被誤拆為多層巢狀：
+
+```gherkin
+Then 查詢設定(200)回應, with table:
+  | content.["btn.save"] | content.["btn.cancel"] |
+  | 儲存                  | 取消                    |
+```
+
+## Response Header 驗證
+
+使用 `H:` 前綴驗證回應中的 HTTP Header 值：
+
+```gherkin
+# DataTable
+Then 新增資源(201)回應, with table:
+  | H:Location       | id |
+  | /api/resources/1 | 1  |
+
+# JSON
+Then 新增資源(201)回應為, with JSON:
+  """json
+  {
+    H"Location": "/api/resources/1",
+    "id": 1
+  }
+  """
+```
+
+## 裸值與頂層陣列 Response Body
+
+當 API 回傳裸值（如 `true`、`42`）或頂層陣列時，使用 `B:` 標記整個 response body：
+
+```gherkin
+# 裸值驗證
+Then 查詢資源狀態(200)回應為, with JSON:
+  """json
+  { B: true }
+  """
+
+# 頂層陣列驗證 + Response Header
+Then 批次新增資源(201)回應為, with JSON:
+  """json
+  {
+    H"X-Total-Count": "2",
+    B: [
+      { "id": 1, "name": "資源A" },
+      { "id": 2, "name": "資源B" }
+    ]
+  }
+  """
+```
+
 ## 變數擷取
 
 使用 `>` 和 `<` 在同一欄中上下配對：header 放變數名稱（`>`），row 放回應中的來源欄位（`<`）。

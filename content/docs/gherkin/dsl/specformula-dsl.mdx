@@ -1,0 +1,379 @@
+---
+title: SpecFormula DSL
+description: 使用 dsl.yml 定義可讀的業務 Step，並展開成 ISA Step
+---
+
+SpecFormula DSL 的目的，是讓測試案例可以先用「業務看得懂的句子」撰寫，再由建置流程展開成 SpecFormula ISA 已經支援的 Step。
+
+簡單說：
+
+- `.dsl.feature`：你想讓人閱讀與維護的測試案例。
+- `dsl.yml`：告訴 SpecFormula「某一句 DSL Step 要展開成哪些 ISA Step」。
+- `.isa.feature`：展開後的結果，最後由 SpecFormula ISA backend 執行。
+- `isa.yml`：定義 ISA Step 如何對應 API 呼叫、資料建立、回應驗證等 instruction。
+
+## 什麼時候需要 DSL？
+
+當 ISA Step 太細、太技術化，導致測試案例難以閱讀時，就可以使用 DSL。
+
+例如你不想每個案例都寫：
+
+```gherkin
+Given 準備一個使用者, with table:
+  | >Alice.id | name  | email             | passwordHash | role  | status |
+  | <userId   | Alice | alice@example.com | pass123      | BUYER | ACTIVE |
+```
+
+你可以改成在 `.dsl.feature` 寫：
+
+```gherkin
+Given "Alice" 是一個買家
+```
+
+然後在 `dsl.yml` 定義這句話如何展開。
+
+## 專案檔案放哪裡？
+
+建議把 `.dsl.feature` 和 `dsl.yml` 放在同一個測試資源區域。`dsl.yml` 可以放在根目錄，也可以依資料夾拆分；建置流程會掃描資料夾中的 `dsl.yml`。
+
+```text
+src/test/resources/
+├── isa.yml
+├── dsl.yml
+├── 角色設定/
+│   ├── dsl.yml
+│   └── buyer.dsl.feature
+└── 交易流程/
+    ├── dsl.yml
+    └── checkout.dsl.feature
+```
+
+根目錄的 `dsl.yml` 適合放共用 DSL；子資料夾的 `dsl.yml` 適合放該領域專用 DSL。
+
+## dsl.yml 的基本結構
+
+`dsl.yml` 的最上層是 `dsl_steps`。每個 `dsl_steps[]` 定義一種可被 `.dsl.feature` 使用的句子。
+
+```yaml
+dsl_steps:
+  - name: 買家設定
+    format: '^"(?<alias>[^"]+)" 是一個買家$'
+    params:
+      密碼: pass123
+    isa_steps:
+      - instruction: '準備一個使用者, with table:'
+        table:
+          '>{{alias}}.id': '<userId'
+          name: '{{alias}}'
+          email: '{{alias}}@example.com'
+          passwordHash: '{{密碼}}'
+          role: BUYER
+          status: ACTIVE
+```
+
+這個定義代表：當 `.dsl.feature` 出現 `"Alice" 是一個買家` 時，會展開成一個 `準備一個使用者, with table:` ISA Step。
+
+## dsl_steps 欄位說明
+
+| 欄位 | 必填 | 說明 |
+|------|------|------|
+| `name` | 是 | DSL 定義名稱，用於錯誤訊息與除錯。整個掃描範圍內不可重複。 |
+| `format` | 是 | 用來比對 `.dsl.feature` Step 文字的 regex。必須用 `^` 與 `$` 包住完整句子。 |
+| `params` | 否 | 額外參數與預設值。可用來設定固定值，或讓表格/JSON 覆蓋。 |
+| `isa_steps` | 是 | 這個 DSL Step 要展開成的一個或多個 ISA Step。 |
+
+## format：從 DSL Step 抓變數
+
+`format` 是 regex。使用 named group 抓出句子裡的變數：
+
+```yaml
+format: '^"(?<buyerAlias>[^"]+)" 購買 "(?<productAlias>[^"]+)"$'
+```
+
+這會從以下 Step 抓出：
+
+```gherkin
+When "Alice" 購買 "iPhone"
+```
+
+得到：
+
+| 變數 | 值 |
+|------|----|
+| `buyerAlias` | `Alice` |
+| `productAlias` | `iPhone` |
+
+在 `isa_steps` 裡用 `{{buyerAlias}}` 和 `{{productAlias}}` 引用這些變數。
+
+## params：設定預設值或可覆蓋參數
+
+`params` 可以幫 DSL Step 設定預設值：
+
+```yaml
+params:
+  quantity: 1
+```
+
+然後在 `isa_steps` 使用：
+
+```yaml
+'items[0].quantity': '{{quantity}}'
+```
+
+`params` 的用途通常是：
+
+- 把常用預設值集中在 `dsl.yml`。
+- 避免每個 `.dsl.feature` 都重複寫技術欄位。
+- 保留未來讓 PM / QA 用表格或 JSON 覆蓋參數的空間。
+
+## isa_steps：展開成 ISA Step
+
+`isa_steps` 是實際輸出的 ISA Step 清單。每個項目至少要有 `instruction`。
+
+### 展開成沒有 payload 的 Step
+
+```yaml
+isa_steps:
+  - instruction: '系統中應有 {{count}} 個使用者'
+```
+
+輸出：
+
+```gherkin
+Then 系統中應有 2 個使用者
+```
+
+### 展開成 DataTable Step
+
+```yaml
+isa_steps:
+  - instruction: '準備一個使用者, with table:'
+    table:
+      '>{{alias}}.id': '<userId'
+      name: '{{alias}}'
+      email: '{{alias}}@example.com'
+      role: BUYER
+```
+
+輸出：
+
+```gherkin
+Given 準備一個使用者, with table:
+  | >Alice.id | name  | email             | role  |
+  | <userId   | Alice | Alice@example.com | BUYER |
+```
+
+### 展開成文字 DocString
+
+如果 ISA instruction 的 `data_format` 是 `text`，可以使用 `text`：
+
+```yaml
+isa_steps:
+  - instruction: '記錄 audit:'
+    text: |
+      buyer={{buyerAlias}}
+      product={{productAlias}}
+```
+
+輸出：
+
+```gherkin
+Then 記錄 audit:
+  """
+  buyer=Alice
+  product=iPhone
+  """
+```
+
+### 展開成 JSON DocString
+
+如果 ISA instruction 的 `data_format` 是 `json`，可以用 `table` 寫 key/value，建置時會輸出 JSON DocString：
+
+```yaml
+isa_steps:
+  - instruction: '送出事件 JSON:'
+    table:
+      buyer: '{{buyerAlias}}'
+      product: '{{productAlias}}'
+```
+
+輸出：
+
+```gherkin
+When 送出事件 JSON:
+  """json
+  {
+    "buyer": "Alice",
+    "product": "iPhone"
+  }
+  """
+```
+
+實際會輸出 DataTable 還是 DocString，取決於該 `instruction` 在 `isa.yml` 中設定的 `data_format`。
+
+## 完整範例：一個 DSL Step 組合多個 ISA Step
+
+DSL 最有價值的地方，不是只把一句話改寫成另一句話，而是把「一個業務動作」展開成一整段 ISA 流程。
+
+以下範例中，QA 只在 `.dsl.feature` 寫一句：
+
+```gherkin
+When "Alice" 使用信用卡購買 "Apple Store" 商店的 2 件 "iPhone"
+```
+
+建置流程會把它展開成多個 ISA Step：建立測試資料、呼叫下單 API、驗證 API 回應、驗證資料庫訂單狀態、再驗證付款事件。
+
+### 1. 在 dsl.yml 定義 DSL Step
+
+```yaml
+dsl_steps:
+  - name: 買家使用信用卡完成購買
+    format: '^"(?<buyerAlias>[^"]+)" 使用信用卡購買 "(?<shopAlias>[^"]+)" 商店的 (?<quantity>\d+) 件 "(?<productAlias>[^"]+)"$'
+    params:
+      currency: TWD
+      paymentMethod: CREDIT_CARD
+      expectedOrderStatus: PAID
+      expectedEventType: ORDER_PAID
+    isa_steps:
+      - instruction: '準備商品庫存, with table:'
+        table:
+          '>Inventory.id': '<inventoryId'
+          productId: '${{productAlias}}.id'
+          shopId: '${{shopAlias}}Shop.id'
+          availableQuantity: 10
+
+      - instruction: '(UID="${{buyerAlias}}.id") 建立訂單, call table:'
+        table:
+          '>LastOrder.id': '<orderId'
+          shopId: '${{shopAlias}}Shop.id'
+          currency: '{{currency}}'
+          paymentMethod: '{{paymentMethod}}'
+          'items[0].productId': '${{productAlias}}.id'
+          'items[0].quantity': '{{quantity}}'
+
+      - instruction: '建立訂單(201)回應, with table:'
+        table:
+          '>LastOrder.id': '<orderId'
+          status: '{{expectedOrderStatus}}'
+          currency: '{{currency}}'
+          paid: true
+          totalAmount: '&gt(0)'
+
+      - instruction: '訂單資料庫應符合, with table:'
+        table:
+          orderId: '$LastOrder.id'
+          buyerId: '${{buyerAlias}}.id'
+          shopId: '${{shopAlias}}Shop.id'
+          status: '{{expectedOrderStatus}}'
+          itemCount: '{{quantity}}'
+
+      - instruction: '應發布付款事件 JSON:'
+        table:
+          eventType: '{{expectedEventType}}'
+          orderId: '$LastOrder.id'
+          buyerId: '${{buyerAlias}}.id'
+          productId: '${{productAlias}}.id'
+          quantity: '{{quantity}}'
+```
+
+這個 DSL Step 的重點是：`isa_steps` 是清單，因此可以輸出不只一個 ISA Step。每個輸出的 `instruction` 都仍然必須對應到 `isa.yml instructions[]` 的某一條規則。
+
+### 2. 在 .dsl.feature 使用 DSL Step
+
+```gherkin
+Feature: 信用卡結帳
+
+  Example: 買家完成信用卡購買
+    When "Alice" 使用信用卡購買 "Apple Store" 商店的 2 件 "iPhone"
+```
+
+### 3. 建置流程展開成 ISA Step
+
+```gherkin
+Feature: 信用卡結帳
+
+  Example: 買家完成信用卡購買
+    Given 準備商品庫存, with table:
+      | >Inventory.id | productId  | shopId              | availableQuantity |
+      | <inventoryId  | $iPhone.id | $Apple StoreShop.id | 10                |
+
+    When (UID="$Alice.id") 建立訂單, call table:
+      | >LastOrder.id | shopId              | currency | paymentMethod | items[0].productId | items[0].quantity |
+      | <orderId      | $Apple StoreShop.id | TWD      | CREDIT_CARD   | $iPhone.id          | 2                 |
+
+    Then 建立訂單(201)回應, with table:
+      | >LastOrder.id | status | currency | paid | totalAmount |
+      | <orderId      | PAID   | TWD      | true | &gt(0)      |
+
+    Then 訂單資料庫應符合, with table:
+      | orderId       | buyerId   | shopId              | status | itemCount |
+      | $LastOrder.id | $Alice.id | $Apple StoreShop.id | PAID   | 2         |
+
+    Then 應發布付款事件 JSON:
+      """json
+      {
+        "eventType": "ORDER_PAID",
+        "orderId": "$LastOrder.id",
+        "buyerId": "$Alice.id",
+        "productId": "$iPhone.id",
+        "quantity": "2"
+      }
+      """
+```
+
+這種寫法讓 `.dsl.feature` 保持業務可讀性，同時仍保留 ISA 對 API、response、DB 與事件 payload 的明確驗證能力。
+
+## 與 isa.yml 的關係
+
+`dsl.yml` 不負責定義 API、資料庫或 instruction type。它只負責「把一個 DSL Step 轉成一個或多個 ISA Step」。
+
+真正決定 ISA Step 行為的是 `isa.yml`：
+
+```yaml
+instructions:
+  - name: 準備商品庫存
+    format: '^準備商品庫存, with table:$'
+    instruction_type: database_seed
+    data_format: data_table
+
+  - name: 建立訂單
+    format: '^\(UID="(?<uid>[^\"]+)"\) 建立訂單, call table:$'
+    instruction_type: api_call
+    data_format: data_table
+
+  - name: 建立訂單回應
+    format: '^建立訂單\((?<status>\d+)\)回應, with table:$'
+    instruction_type: response_validate
+    data_format: data_table
+
+  - name: 訂單資料庫驗證
+    format: '^訂單資料庫應符合, with table:$'
+    instruction_type: database_validate
+    data_format: data_table
+
+  - name: 付款事件驗證
+    format: '^應發布付款事件 JSON:$'
+    instruction_type: event_validate
+    data_format: json
+```
+
+所以設計 DSL 時，請先確認你要展開出的每一個 `instruction` 文字都已經存在於 `isa.yml`。
+
+## 下一步
+
+本頁聚焦在 `dsl.yml` 如何設計 DSL Step，以及一個 DSL Step 如何組合多個 ISA Step。
+
+實際專案要如何啟用 DSL preprocessing，請看快速開始／安裝頁：
+
+- [Java / Maven](/docs/installation/java)
+- [C# / Reqnroll](/docs/installation/csharp)
+
+## 常見錯誤
+
+| 錯誤 | 常見原因 | 修正方式 |
+|------|----------|----------|
+| 找不到 `dsl.yml` | 檔案不在測試資源掃描範圍 | 把 `dsl.yml` 放到測試 resources，或調整 DSL plugin 的 source/config path。 |
+| DSL Step 沒有展開 | `format` regex 沒有 match Step 文字 | 確認 `format` 有 `^` / `$`，並測試 named group 是否抓到正確文字。 |
+| 展開後找不到 ISA instruction | `isa_steps[].instruction` 和 `isa.yml instructions[].format` 不一致 | 先把展開後文字貼到 `.isa.feature` 驗證，再修正 `instruction` 或 `isa.yml` regex。 |
+| `{{變數}}` 沒有被替換 | 變數名稱不是 `format` named group，也不是 `params` | 修正 named group 名稱、`params` 名稱或 template reference。 |
+| payload 格式錯誤 | `table` / `text` 和 ISA `data_format` 不一致 | `data_table` / `json` 使用 `table`；`text` 使用 `text`；`none` 不要放 payload。 |

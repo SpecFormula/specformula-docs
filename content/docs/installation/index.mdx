@@ -1,0 +1,38 @@
+---
+title: 安裝與導入
+description: Java 與 C# 專案導入 SpecFormula 的入口指南
+---
+
+SpecFormula 的規格層是跨語言共用的：`isa.yml`、OpenAPI spec、DDL/mapping、`.isa.feature` 與 `.dsl.feature` 應維持同一套語意。語言套件只負責把這些規格接到各自的 BDD runtime 與測試框架。
+
+## 選擇你的技術棧
+
+| 技術棧 | BDD runtime | 建置工具 | 導入指南 |
+|--------|-------------|----------|----------|
+| Java | Cucumber JVM | Maven | [Java / Maven](/docs/installation/java) |
+| C# | Reqnroll | .NET SDK / MSBuild | [C# / Reqnroll](/docs/installation/csharp) |
+
+## 共用測試資源
+
+不論使用哪一種語言，測試專案通常需要以下檔案：
+
+```text
+MyProject.Tests/
+├── Features/
+│   ├── *.isa.feature        # ISA Gherkin feature
+│   └── *.dsl.feature        # 選配：SpecFormula DSL source
+├── specs/
+│   ├── api/api-spec.yml     # OpenAPI
+│   └── data/
+│       ├── schema.sql
+│       └── entity_to_table_mapping.yml
+├── isa.yml                  # ISA runtime configuration
+└── dsl.yml                  # 選配：DSL phrase / composition configuration
+```
+
+## 版本與套件狀態
+
+目前文件以開發版 repo 結構為準：
+
+- Java 使用 Maven module / local Maven install。
+- C# 使用 ProjectReference；正式 NuGet 套件名稱與發版流程確定後，需再更新成 `dotnet add package` 指令。

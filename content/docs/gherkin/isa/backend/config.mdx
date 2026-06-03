@@ -68,9 +68,19 @@ instructions:
     format: ^應該存在一個(?P<entity>[\u4e00-\u9fffa-zA-Z0-9_]+), with table:$
     instruction_type: entity_validate
 
+  - name: Database validation (JSON)
+    format: ^應該存在一個(?P<entity>[\u4e00-\u9fffa-zA-Z0-9_]+), with json:$
+    instruction_type: entity_validate
+    data_format: json
+
   - name: Database non-existence validation
     format: ^應該不存在一個(?P<entity>[\u4e00-\u9fffa-zA-Z0-9_]+), with table:$
     instruction_type: entity_non_existence_validate
+
+  - name: Data preparation (JSON)
+    format: ^準備一個(?P<entity>[\u4e00-\u9fffa-zA-Z0-9_]+), with json:$
+    instruction_type: entity_setup
+    data_format: json
 ```
 
 ## API 配置
@@ -117,7 +127,32 @@ instructions:
 | `name` | 資料源名稱（必填） | — |
 | `resource_path` | DDL 與 mapping 檔案在 classpath 中的路徑（必填） | — |
 | `project_path` | DDL 與 mapping 檔案在專案中的路徑（供 Lint 使用，必填） | — |
-| `db_type` | 資料庫類型：`h2`、`postgresql`、`mysql`、`mssql` | `h2` |
+| `db_type` | 資料庫類型：`embedded`、`postgresql`、`mysql`、`mssql`。`embedded` 為「框架選實作」抽象代名（Java→H2、C#→sqlite-style、Python→DuckDB）。 | `embedded` |
+| `schema` | 指定 DataSource 連線的預設 schema（選填） | 資料庫預設值 |
+
+### Schema 設定
+
+`schema` 欄位用於企業級多 schema 架構，指定 DataSource 連線的預設 schema：
+```yaml
+config:
+  data:
+    source:
+      - name: default
+        resource_path: specs/data
+        db_type: postgresql
+        schema: app_schema       # 選填
+```
+
+各資料庫的行為差異：
+
+| db_type | schema 行為 | 預設 schema |
+|---------|------------|-------------|
+| `postgresql` | 設定 `search_path` 為 `"<schema>", public` | `public` |
+| `mssql` | 設定連線的 `DEFAULT_SCHEMA` | `dbo` |
+| `mysql` / `mariadb` | 忽略（schema 等同於 database，由連線 URL 決定） | N/A |
+| `embedded` | 忽略（內嵌測試資料庫，不支援多 schema 路由；Java 實作使用 H2） | `PUBLIC` |
+
+DDL 中的 `CREATE TABLE` 語句可包含 schema 前綴（如 `CREATE TABLE dbo.users (...)`），框架會擷取並保存 schema 前綴，在生成的 SQL 中使用完整限定名（`schema.table`）。
 
 ### 資料夾結構
 
@@ -154,7 +189,40 @@ Given 準備一個使用者, with table:
 | `name` | 指令名稱（用於識別與錯誤訊息） |
 | `format` | 正則表達式，用於匹配 Gherkin Step |
 | `instruction_type` | 對應的 ISA 指令類型 |
-| `data_format` | 資料格式：`data_table`（預設）、`json` |
+| `data_format` | Step payload 格式：`none`、`data_table`、`json`、`text`。省略時依 `instruction_type` 決定預設值。 |
+
+### data_format payload contract
+
+`data_format` 描述 Step 後方是否需要 DataTable 或 DocString，以及 DocString 內容應如何解析。這是 ISA 與各語言 runtime 的共同契約。
+
+| data_format | Payload | 用途 |
+|-------------|---------|------|
+| `none` | 無 payload | 不接 DataTable / DocString 的指令；`custom` 預設為 `none`。 |
+| `data_table` | Gherkin DataTable | 表格型資料準備、API call、回應驗證、Entity 驗證。 |
+| `json` | JSON DocString | JSON body、JSON response expectation、JSON Entity payload。 |
+| `text` | Text DocString | 純文字 payload；若 Step 使用文字 DocString，必須明確設定 `data_format: text`。 |
+
+預設規則：
+
+- 內建 ISA 指令若未指定 `data_format`，預設為 `data_table`。
+- `instruction_type: custom` 若未指定 `data_format`，預設為 `none`，代表 Step Definition 自行決定行為且不由 ISA runtime 解析 payload。
+- JSON DocString 必須設定 `data_format: json`。
+- 純文字 DocString 必須設定 `data_format: text`，避免被誤判成無 payload 或 JSON。
+
+範例：
+
+```yaml
+instructions:
+  - name: Custom log message
+    format: ^記錄訊息:$
+    instruction_type: custom
+    data_format: text
+
+  - name: Custom checkpoint
+    format: ^標記檢查點 (?P<name>.+)$
+    instruction_type: custom
+    # data_format 省略，custom 預設為 none
+```
 
 ### 指令類型對照
 
@@ -170,11 +238,19 @@ Given 準備一個使用者, with table:
 
 ### 正則表達式與 Gherkin 的對應
 
-`format` 中的正則表達式用於匹配 Gherkin Step 文字，並透過 `(?P<name>...)` 語法擷取參數。以 `api_call` 為例：
+ISA 的指令映射 **不支援 Cucumber Expression**（例如 `{int}`、`{string}`）。
+
+`format` 必須使用 **正則表達式** 完整匹配 Gherkin Step 文字，並透過 **命名擷取群組（named capture group）** 取得參數。
+
+- **Python 寫法**：`(?P<name>...)`
+- **Java/JVM 寫法**：`(?<name>...)`
+
+以 `api_call` 為例：
 
 ```
 Gherkin:  (UID="$Alice.id") 新增待辦事項, call table:
-正則:     ^\((?:No Actor|UID="(?P<userId>...)")\) (?P<summary>.+?), call table:$
+正則（Python）: ^\((?:No Actor|UID="(?P<userId>...)")\) (?P<summary>.+?), call table:$
+正則（Java）:   ^\((?:No Actor|UID="(?<userId>...)")\) (?<summary>.+?), call table:$
 擷取:              userId = $Alice.id      summary = 新增待辦事項
 ```
 

@@ -309,6 +309,25 @@ Gherkin: punchType  → DB: punch_type
 Gherkin: punchTime  → DB: punch_time
 ```
 
+在實際比對資料庫欄位時，框架會對每一個欄位名稱套用三層匹配邏輯：
+
+- **第一層：精確匹配**
+  - 先用原始欄位名稱直接找，例如 `agentId` 對 `agentId`。
+- **第二層：camelCase → snake_case**
+  - 若找不到精確匹配，會將 `agentId` 轉成 `agent_id`，再嘗試匹配 DDL / 實際資料的欄位名稱。
+- **第三層：忽略大小寫**
+  - 若前兩層都沒找到，最後會以「忽略大小寫」的方式比對，例如 `agent_id`、`AGENT_ID`、`Agent_Id` 都會被視為同一個欄位。
+
+以下是幾種常見組合的行為（左邊是 Feature／DataTable 欄位，右邊是 DDL／實際 Map 的 key）：
+
+| Feature 欄位名稱 | DDL / Map 欄位名稱 | 是否匹配 | 說明 |
+|------------------|--------------------|----------|------|
+| `agentId`        | `agentId`          | ✅ 是 | 第一層：直接 `equals` 匹配 |
+| `agentId`        | `agent_id`         | ✅ 是 | 第二層：camelCase → snake_case |
+| `agentId`        | `AGENT_ID`         | ✅ 是 | 第二層轉成 `agent_id` 後，再第三層 `equalsIgnoreCase` 匹配 |
+
+因此只要在 Spec／Gherkin 中統一使用 camelCase，就能穩定對應到 DDL 中常見的 snake_case 或全大寫命名，而不需要在測試或程式碼中手動處理大小寫與底線差異。
+
 ---
 
 ## ISA Config（配置檔）
@@ -368,7 +387,7 @@ instructions:
 |--------|------|
 | `config.api.resource_path` | API Spec 的 classpath 相對路徑 |
 | `config.data.source[]` | 可配置多個 Data Source，每個各自指向一組 Entity Spec |
-| `config.data.source[].db_type` | 資料庫類型（h2, mssql, postgresql, mysql） |
+| `config.data.source[].db_type` | 資料庫類型（embedded, mssql, postgresql, mysql）；`embedded` 為「框架選實作」抽象代名 |
 | `instructions[].format` | 指令的正規表達式，用於匹配 Gherkin 步驟 |
 | `instructions[].instruction_type` | 指令類型，決定執行邏輯 |
 
@@ -457,4 +476,10 @@ Lint 會檢查：
 
 ```bash
 mvn test
+```
+
+**C# (Reqnroll / .NET)**
+
+```bash
+dotnet test
 ```

@@ -50,6 +50,95 @@ Given prepare a todo, with table:
   | $Alice.id | Buy milk |
 ```
 
+## JSON Field Description
+
+When Entity fields store JSON objects (e.g., PostgreSQL JSONB, MySQL JSON), two methods are available to describe JSON field content.
+
+### JSON Path DataTable Header
+
+Use path syntax in DataTable headers to expand JSON structures:
+
+```gherkin
+Given prepare an order, with table:
+  | id | orderItems[0].productId | orderItems[0].quantity | orderItems[1].productId | orderItems[1].quantity |
+  | 1  | 5                       | 2                      | 6                       | 10                     |
+```
+
+Equivalent to the compressed single-line string:
+
+```gherkin
+Given prepare an order, with table:
+  | id | orderItems                                                   |
+  | 1  | [{"productId":5,"quantity":2},{"productId":6,"quantity":10}] |
+```
+
+With Symbol System:
+
+```gherkin
+Given prepare an order, with table:
+  | id | orderItems[0].productId | orderItems[0].createdAt |
+  | 1  | $productId              | @time(now)              |
+```
+
+### JSON DocString Format
+
+Use `with json:` with `"""json ... """` to write structured JSON directly, ideal for deeply nested structures:
+
+```gherkin
+Given prepare an order, with json:
+  """json
+  {
+    "id": 1,
+    "orderItems": [
+      { "productId": 5, "quantity": 2 },
+      { "productId": 6, "quantity": 10 }
+    ]
+  }
+  """
+```
+
+Multiple records using JSON Array:
+
+```gherkin
+Given prepare an order detail, with json:
+  """json
+  [
+    { "orderId": 1, "productId": 101, "quantity": 2 },
+    { "orderId": 1, "productId": 102, "quantity": 1 }
+  ]
+  """
+```
+
+With Symbol System:
+
+```gherkin
+Given prepare an order, with json:
+  """json
+  {
+    >orderId: <id,
+    "orderNo": "ORD-001",
+    "createdAt": @time(now),
+    "orderItems": [
+      { "productId": $productId, "quantity": 2 }
+    ]
+  }
+  """
+```
+
+> **JSON format note**: Symbol system expressions (`$` variables, `&` CAS constraints, `@` time symbols, `>`/`<` extraction keys) must NOT be placed inside JSON string quotes `""`, otherwise they are treated as plain strings.
+
+### Escaping Keys Containing `.`
+
+When a JSON key itself contains a `.` character, use `["..."]` bracket notation to prevent it from being split into nested levels:
+
+```gherkin
+Given prepare a setting, with table:
+  | id | content.["btn.save"] | content.["btn.cancel"] |
+  | 1  | Save                 | Cancel                 |
+```
+
+In JSON DocString, use the original key directly — the framework handles escaping automatically.
+
 ---
 
 ## Mapping to Entity Spec
@@ -116,6 +205,23 @@ entity_to_table_mapping:
 Gherkin: userId    → DB: user_id
 Gherkin: createdAt → DB: created_at
 ```
+
+When resolving or validating database columns, the framework applies the same three-step strategy for each field name:
+
+- **Step 1: exact match**
+  - First, it looks for the original field name as-is, for example `userId` vs `userId`.
+- **Step 2: camelCase → snake_case**
+  - If no exact match is found, it converts `userId` to `user_id` and tries to match again against the DDL / actual data.
+- **Step 3: case-insensitive**
+  - If the first two steps still fail, it finally falls back to case-insensitive comparison, so `user_id`, `USER_ID`, and `User_Id` are treated as the same column.
+
+| Feature field name | DDL / Map field name | Match? | Explanation |
+|--------------------|----------------------|--------|-------------|
+| `userId`           | `userId`             | ✅ Yes | Step 1: direct `equals` match |
+| `userId`           | `user_id`            | ✅ Yes | Step 2: camelCase → snake_case |
+| `userId`           | `USER_ID`            | ✅ Yes | Step 2 to `user_id`, then Step 3 `equalsIgnoreCase` |
+
+In practice, as long as you consistently use camelCase in Specs, the engine can robustly resolve both snake_case and upper-case column names from the DDL, without requiring manual handling of case or underscores in SQL or code.
 
 ### Schema Validation
 

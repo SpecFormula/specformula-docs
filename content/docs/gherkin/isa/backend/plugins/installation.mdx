@@ -1,0 +1,61 @@
+---
+title: 安裝 Plugin
+description: 在 Java 或 C# 測試專案中加入 SpecFormula Plugin 套件
+---
+
+Plugin 應該以套件形式提供。使用者只需要把 plugin 套件加入測試專案，讓它出現在測試執行時的 classpath / assembly load path。
+
+本頁只說明「怎麼把 plugin 裝進測試專案」。裝好後，plugin 的參數與停用規則都放在 `isa.yml plugins.config`。
+
+## Java / Maven
+
+把 plugin JAR 加到測試專案的 test classpath：
+
+```xml
+<dependency>
+  <groupId>com.example</groupId>
+  <artifactId>specformula-audit-plugin</artifactId>
+  <version>1.0.0</version>
+  <scope>test</scope>
+</dependency>
+```
+
+如果 plugin 是同一個 multi-module repo 裡的 Maven module，也可以直接依賴該 module：
+
+```xml
+<dependency>
+  <groupId>com.example</groupId>
+  <artifactId>my-local-specformula-plugin</artifactId>
+  <version>${project.version}</version>
+  <scope>test</scope>
+</dependency>
+```
+
+一般使用者不需要手動建立 Java discovery metadata；這應該由 plugin JAR 自己打包。
+
+## C# / .NET
+
+正式發布後通常使用 NuGet package：
+
+```bash
+dotnet add MyProject.Tests package Example.SpecFormula.AuditPlugin
+```
+
+開發中的本地 plugin 可以用 `ProjectReference`：
+
+```xml
+<ItemGroup>
+  <ProjectReference Include="../Example.SpecFormula.AuditPlugin/Example.SpecFormula.AuditPlugin.csproj" />
+</ItemGroup>
+```
+
+測試專案仍需載入 SpecFormula 的 Reqnroll integration。第三方 SpecFormula plugin assembly 只要位於測試輸出與載入路徑中，就能被 runtime 載入。
+
+## 安裝後檢查
+
+1. plugin 套件在測試專案 dependency graph 中。
+2. plugin JAR / assembly 會出現在測試執行時 classpath 或 output folder。
+3. plugin 文件提供了 plugin id，例如 `audit`。
+4. plugin 文件列出可用的 `instruction_type`、支援的 `data_format`，以及可配置/可停用的項目。
+
+下一步：到 [Plugin 配置](/docs/gherkin/isa/backend/plugins/configuration) 把 plugin id 與設定放進 `isa.yml`。

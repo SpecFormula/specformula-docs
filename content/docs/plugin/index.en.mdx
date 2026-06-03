@@ -1,0 +1,25 @@
+---
+title: Plugin Development
+description: Choose the Java or C# guide for developing SpecFormula plugins
+---
+
+Plugin development documentation is split by language. The conceptual plugin contract is cross-language, but discovery, package layout, BDD runtime integration, and testing differ by language.
+
+## Choose a language
+
+<Cards>
+  <Card title="Java / Maven / Cucumber JVM" href="/docs/plugin/java" />
+  <Card title="C# / .NET / Reqnroll" href="/docs/plugin/csharp" />
+</Cards>
+
+## Shared contract
+
+Regardless of language, plugins use the same configuration and contribution names:
+
+- plugin id: maps to `isa.yml plugins.config.<id>`.
+- `instructions`: provides new `instruction_type` values.
+- `lifecycle_hooks`: provides hooks around test execution.
+- `spec_readers`: provides readers for additional spec kinds.
+- `disabled.instructions` / `disabled.lifecycle_hooks` / `disabled.spec_readers`: lets users disable individual contributions from `isa.yml`.
+
+For implementation details, open the language-specific page.
