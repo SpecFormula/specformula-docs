@@ -2,7 +2,7 @@ import type { BaseLayoutProps } from 'fumadocs-ui/layouts/shared';
 
 // fill this with your actual GitHub info, for example:
 export const gitConfig = {
-  user: 'anthropics',
+  user: 'SpecFormula',
   repo: 'specformula-docs',
   branch: 'main',
 };
