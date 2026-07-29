@@ -59,7 +59,7 @@ Terms are grouped by category: instructions, symbols, spec & SSOT, the ADR syste
 | Domain | A set of business scenarios and fixtures within the benchmark. | `ecommerce_platform`, `todo_list`, `guessing_game`, `agent_hr_system` |
 | Conformance | Behavioral consistency of a target against a given spec or benchmark case. Scope matters: single language, single domain, or cross-target. | Java `specformula-core` tests pass; `todo_list` adapter E2E passes |
 | Target service | The service or application under test within a benchmark domain. | `benchmark/ecommerce_platform/*`, `benchmark/todo_list/*` |
-| Adapter | The bridge layer between a benchmark target service and the SpecFormula runner. Some domains use an adapter; some language targets run native tests directly. | `benchmark/ecommerce_platform/adapter/` |
+| Adapter | The bridge layer between a benchmark target service and the SpecFormula runner. Some domains use an adapter; some language targets run native tests directly. | `benchmark/adapter/` (shared by all benchmarks; per-benchmark config in `configs/<benchmark>.yml`) |
 
 ## Roles & implementations
 

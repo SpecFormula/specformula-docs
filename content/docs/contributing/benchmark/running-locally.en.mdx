@@ -18,12 +18,12 @@ cd benchmark/ecommerce_platform/python && behave
 
 ## Mode 2: Java-For-All adapter
 
-`ecommerce_platform` and `todo_list` also have an `adapter/`: it uses the Java side's single Spec, HTTP-forwards `api-call` to the target language's service, and runs `entity-setup` / `entity-validate` by connecting to the DB directly from Java. Every language thus passes the exact same Spec, with no test-framework differences.
+`ecommerce_platform` and `todo_list` share `benchmark/adapter/`: it uses the Java side's single Spec, HTTP-forwards `api-call` to the target language's service, and runs `entity-setup` / `entity-validate` by connecting to the DB directly from Java. Every language thus passes the exact same Spec, with no test-framework differences.
 
 ```bash
-cd benchmark/ecommerce_platform/adapter
-./run.sh --build python           # build the python target image, then run
-./run.sh --expected-failure       # run only the @expected-failure scenarios
+cd benchmark/adapter
+./run.sh ecommerce_platform --build python     # build the python target image, then run
+./run.sh ecommerce_platform --expected-failure # run only the @expected-failure scenarios
 ```
 
 Prerequisites: Docker running, Maven installed. Details and the Test Control API contract are in [adding a language target](/docs/contributing/benchmark/adding-language).

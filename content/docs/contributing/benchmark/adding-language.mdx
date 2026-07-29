@@ -9,7 +9,7 @@ description: 透過 Java-For-All Adapter 把既有 benchmark domain 擴展到新
 
 ## Adapter 是什麼
 
-每個 domain 的 `adapter/` 是一個 Spring Boot 子專案，與該 domain 的 `specs/`（`.isa.feature`、`api-spec.yml`、Entity DDL）共用同一份語言中立規格。
+所有 domain 共用 `benchmark/adapter/`（Spring Boot 子專案），與各 domain 的 `specs/`（`.isa.feature`、`api-spec.yml`、Entity DDL）共用同一份語言中立規格；per-domain 差異（要起哪些 DB、cleanup 表）由 `benchmark/adapter/configs/<domain>.yml` 宣告。
 
 - 測試端（`adapter/src/test`）用 Cucumber + SpecFormula + MockMvc，與一般 Java benchmark 配置一致。
 - 實作端（`adapter/src/main`）是一個 catch-all `ProxyController`（`@RequestMapping("/**")`），把收到的請求原封不動 HTTP 轉發到被測服務。新增 API 時 adapter 不需要修改，SpecFormula 框架也不需要任何改動。
@@ -31,14 +31,15 @@ Then   驗證 DB 狀態    ->  Java JDBC SELECT 查 DB
 ## 目錄結構
 
 ```text
-benchmark/<domain>/
-├── specs/            # 所有語言共用：features/*.isa.feature、api/api-spec.yml、data/*/DDL
-├── java/             # Java 原生 benchmark（MockMvc 模式，保持不變）
-├── adapter/          # Java-For-All adapter（Spring Boot：ProxyController + stepdefs + run.sh）
-├── python/           # 各語言 target：業務程式 + Dockerfile + build.sh
-├── typescript/
-├── csharp/
-└── ...               # go、rust 等視 domain 而定
+benchmark/
+├── adapter/          # Java-For-All adapter，所有 domain 共用（ProxyController + stepdefs + run.sh + configs/）
+└── <domain>/
+    ├── specs/            # 所有語言共用：features/*.isa.feature、api/api-spec.yml、data/*/DDL
+    ├── java/             # Java 原生 benchmark（MockMvc 模式，保持不變）
+    ├── python/           # 各語言 target：業務程式 + Dockerfile + build.sh
+    ├── typescript/
+    ├── csharp/
+    └── ...               # go、rust 等視 domain 而定
 ```
 
 ## 新語言接入流程
@@ -72,14 +73,14 @@ benchmark/<domain>/
 
 ## 執行
 
-每個 domain 的 `adapter/` 目錄有標準化的 `run.sh`。前置條件：Docker 正在運行、Maven 已安裝。
+所有 domain 共用 `benchmark/adapter/`，其標準化 `run.sh` 以第一個參數指定 benchmark。前置條件：Docker 正在運行、Maven 已安裝。
 
 ```bash
-cd benchmark/ecommerce_platform/adapter
+cd benchmark/adapter
 
-./run.sh --build python          # 先 build python target image，再跑測試
-./run.sh my-go-service:latest    # 直接用已存在的 image 跑
-./run.sh --expected-failure      # 只跑標記 @expected-failure 的 scenario
+./run.sh ecommerce_platform --build python          # 先 build python target image，再跑測試
+./run.sh ecommerce_platform my-go-service:latest    # 直接用已存在的 image 跑
+./run.sh ecommerce_platform --expected-failure      # 只跑標記 @expected-failure 的 scenario
 ```
 
 紅綠燈循環：讀失敗的 scenario，找出缺的 API 或不符的行為，在 `<language>/` 實作或修正，重跑 `run.sh` 直到全綠。

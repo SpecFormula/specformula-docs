@@ -59,7 +59,7 @@ description: specformula-dev-framework 貢獻者常用術語定義，依類別�
 | Domain | benchmark 中的一組業務情境與 fixture。 | `ecommerce_platform`、`todo_list`、`guessing_game`、`agent_hr_system` |
 | Conformance | 某 target 對指定規格 / benchmark case 的行為一致性。需看 scope：單語言、單 domain 或跨 target。 | Java `specformula-core` tests 通過；`todo_list` adapter E2E 通過 |
 | Target service | benchmark domain 中被測的服務或應用。 | `benchmark/ecommerce_platform/*`、`benchmark/todo_list/*` |
-| Adapter | benchmark target service 與 SpecFormula runner 之間的橋接層；有些 domain 使用 adapter，有些語言 target 直接跑 native test。 | `benchmark/ecommerce_platform/adapter/` |
+| Adapter | benchmark target service 與 SpecFormula runner 之間的橋接層；有些 domain 使用 adapter，有些語言 target 直接跑 native test。 | `benchmark/adapter/`（各 benchmark 共用，設定在 `configs/<benchmark>.yml`） |
 
 ## 角色與實作
 
