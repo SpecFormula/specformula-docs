@@ -18,12 +18,12 @@ cd benchmark/ecommerce_platform/python && behave
 
 ## 模式二：Java-For-All adapter
 
-`ecommerce_platform` 與 `todo_list` 另有 `adapter/`：用 Java 端的同一份 Spec，透過 HTTP 把 `api-call` 轉發到被測語言的 service，`entity-setup` / `entity-validate` 由 Java 直連 DB。這樣所有語言過完全相同的 Spec，沒有測試框架差異。
+`ecommerce_platform` 與 `todo_list` 共用 `benchmark/adapter/`：用 Java 端的同一份 Spec，透過 HTTP 把 `api-call` 轉發到被測語言的 service，`entity-setup` / `entity-validate` 由 Java 直連 DB。這樣所有語言過完全相同的 Spec，沒有測試框架差異。
 
 ```bash
-cd benchmark/ecommerce_platform/adapter
-./run.sh --build python           # build python target image 再跑
-./run.sh --expected-failure       # 只跑標記 @expected-failure 的 scenario
+cd benchmark/adapter
+./run.sh ecommerce_platform --build python     # build python target image 再跑
+./run.sh ecommerce_platform --expected-failure # 只跑標記 @expected-failure 的 scenario
 ```
 
 前置：Docker 運行中、Maven 已安裝。細節與 Test Control API 契約見 [新增語言 target](/docs/contributing/benchmark/adding-language)。

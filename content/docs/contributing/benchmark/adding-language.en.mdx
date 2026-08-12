@@ -9,7 +9,7 @@ A new-language contributor only implements business logic, the Test Control API,
 
 ## What the adapter is
 
-Each domain's `adapter/` is a Spring Boot subproject that shares the domain's language-neutral `specs/` (`.isa.feature`, `api-spec.yml`, Entity DDL).
+All domains share `benchmark/adapter/` (a Spring Boot subproject) that consumes each domain's language-neutral `specs/` (`.isa.feature`, `api-spec.yml`, Entity DDL); per-domain differences (which DBs to start, cleanup tables) are declared in `benchmark/adapter/configs/<domain>.yml`.
 
 - The test side (`adapter/src/test`) uses Cucumber + SpecFormula + MockMvc, the same configuration as a normal Java benchmark.
 - The implementation side (`adapter/src/main`) is a catch-all `ProxyController` (`@RequestMapping("/**")`) that forwards every request as-is over HTTP to the target service. Adding an API requires no adapter change, and the SpecFormula framework needs no change either.
@@ -31,14 +31,15 @@ The target service reads and writes the same DB during the When step, so the Jav
 ## Directory layout
 
 ```text
-benchmark/<domain>/
-├── specs/            # Shared by all languages: features/*.isa.feature, api/api-spec.yml, data/*/DDL
-├── java/             # Java native benchmark (MockMvc mode, unchanged)
-├── adapter/          # Java-For-All adapter (Spring Boot: ProxyController + stepdefs + run.sh)
-├── python/           # Per-language target: business code + Dockerfile + build.sh
-├── typescript/
-├── csharp/
-└── ...               # go, rust, etc. depending on the domain
+benchmark/
+├── adapter/          # Java-For-All adapter shared by all domains (ProxyController + stepdefs + run.sh + configs/)
+└── <domain>/
+    ├── specs/            # Shared by all languages: features/*.isa.feature, api/api-spec.yml, data/*/DDL
+    ├── java/             # Java native benchmark (MockMvc mode, unchanged)
+    ├── python/           # Per-language target: business code + Dockerfile + build.sh
+    ├── typescript/
+    ├── csharp/
+    └── ...               # go, rust, etc. depending on the domain
 ```
 
 ## Onboarding flow for a new language
@@ -75,11 +76,11 @@ The exact endpoint paths and environment variable names follow each domain's `ad
 Each domain's `adapter/` directory has a standardized `run.sh`. Prerequisites: Docker running, Maven installed.
 
 ```bash
-cd benchmark/ecommerce_platform/adapter
+cd benchmark/adapter
 
-./run.sh --build python          # build the python target image, then run tests
-./run.sh my-go-service:latest    # run against an existing image
-./run.sh --expected-failure      # run only scenarios tagged @expected-failure
+./run.sh ecommerce_platform --build python          # build the python target image, then run tests
+./run.sh ecommerce_platform my-go-service:latest    # run against an existing image
+./run.sh ecommerce_platform --expected-failure      # run only scenarios tagged @expected-failure
 ```
 
 Red-green loop: read the failing scenario, find the missing API or mismatched behavior, implement or fix it under `<language>/`, and rerun `run.sh` until everything is green.
