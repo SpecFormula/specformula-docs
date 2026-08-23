@@ -12,18 +12,18 @@ The SSOT is updated and synced to each language; each language implements step d
 ```mermaid
 flowchart TB
     SPEC["SSOT update<br/>specs/ (ADR + executable specs)"]
-    SPEC -->|sync-global-features.sh| A0["implement Step Defs per vocab.md"]
+    SPEC -->|sync-global-features.py| A0["implement Step Defs per vocab.md"]
     A0 --> A1["Java (RI) BDD"]
     A1 --> A2{"new feature / behavior?"}
     A2 -->|yes| A3["update benchmark domain (E2E scenario)"]
     A2 -->|no| BV["benchmark E2E acceptance<br/>cross-language consistency"]
     A3 --> BV
-    SPEC -->|sync-global-features.sh| B0["implement Step Defs per vocab.md"]
+    SPEC -->|sync-global-features.py| B0["implement Step Defs per vocab.md"]
     B0 --> B1["other languages BDD"]
     B1 --> BV
 ```
 
-**① SSOT update** — change `specs/` (ADR + `specs/features/` executable specs); `scripts/sync-global-features.sh <lang>` + terminology mapping mirrors it into each language.
+**① SSOT update** — change `specs/` (ADR + `specs/features/` executable specs); `scripts/sync-global-features.py <lang>` + terminology mapping mirrors it into each language.
 
 **② Implementation (same for RI and other languages)** — implement Step Defs from `vocab.md`, run BDD to green (framework-level conformance). Java is the Reference Implementation, implemented first to validate the spec.
 

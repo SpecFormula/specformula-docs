@@ -24,8 +24,8 @@ Implementer 把語言中立的規格（SSOT）落實到某一個語言。一次�
 全域 `specs/features/` 是唯讀來源。用根目錄腳本把它鏡射進該語言專案的測試目錄（會套用 terminology mapping）；鏡射出來的檔案不要手改，要改規格回 [spec-author](/docs/contributing/spec-author)。
 
 ```bash
-./scripts/sync-global-features.sh <java|typescript|python|csharp>
-./scripts/sync-global-features.sh java --dry-run   # 先預覽差異
+uv run --script scripts/sync-global-features.py <java|typescript|python|csharp>
+uv run --script scripts/sync-global-features.py java --dry-run   # 先預覽差異
 ```
 
 ### benchmark 驗收

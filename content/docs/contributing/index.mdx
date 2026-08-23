@@ -12,18 +12,18 @@ SSOT 更新後 sync 到各語言，各語言建 Step Def、跑 BDD，最後在 b
 ```mermaid
 flowchart TB
     SPEC["SSOT 更新<br/>specs/（ADR + 可執行規格）"]
-    SPEC -->|sync-global-features.sh| A0["依 vocab.md 建立 Step Def"]
+    SPEC -->|sync-global-features.py| A0["依 vocab.md 建立 Step Def"]
     A0 --> A1["Java（RI）BDD"]
     A1 --> A2{"新功能 / 行為？"}
     A2 -->|是| A3["更新 benchmark domain（E2E 情境）"]
     A2 -->|否| BV["benchmark E2E 驗收<br/>跨語言行為一致"]
     A3 --> BV
-    SPEC -->|sync-global-features.sh| B0["依 vocab.md 建立 Step Def"]
+    SPEC -->|sync-global-features.py| B0["依 vocab.md 建立 Step Def"]
     B0 --> B1["其他語言 BDD"]
     B1 --> BV
 ```
 
-**① SSOT 更新** — 改 `specs/`（ADR + `specs/features/` 可執行規格），`scripts/sync-global-features.sh <lang>` + terminology mapping 鏡射到各語言。
+**① SSOT 更新** — 改 `specs/`（ADR + `specs/features/` 可執行規格），`scripts/sync-global-features.py <lang>` + terminology mapping 鏡射到各語言。
 
 **② 各語言實作（RI 與其他語言相同）** — 依 `vocab.md` 建立 Step Def、跑 BDD 到綠（框架層一致性）。Java 是 Reference Implementation，先實作驗證規格可行。
 

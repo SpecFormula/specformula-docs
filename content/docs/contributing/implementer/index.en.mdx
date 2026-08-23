@@ -24,8 +24,8 @@ These two steps are conceptually identical in every language — only the langua
 `specs/features/` is the read-only source. Use the root script to mirror it into the language project's test directory (terminology mapping is applied); never hand-edit the mirrored files — to change the spec, go to [spec-author](/docs/contributing/spec-author).
 
 ```bash
-./scripts/sync-global-features.sh <java|typescript|python|csharp>
-./scripts/sync-global-features.sh java --dry-run   # preview the diff first
+uv run --script scripts/sync-global-features.py <java|typescript|python|csharp>
+uv run --script scripts/sync-global-features.py java --dry-run   # preview the diff first
 ```
 
 ### Benchmark acceptance
